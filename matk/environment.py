@@ -2,17 +2,18 @@ from avstack.datastructs import PriorityQueue
 
 
 class World:
-    def __init__(self, dt) -> None:
+    def __init__(self, dt, extent) -> None:
         self.objects = {}
         self.agents = {}
         self.tracks = {}
         self.t = 0
         self.dt = dt
+        self.extent = extent
 
     def tick(self):
         self.t += self.dt
         for obj in self.objects.values():
-            obj.tick()
+            obj.tick(self.dt)
 
     def add_object(self, obj):
         if obj.ID not in self.objects:

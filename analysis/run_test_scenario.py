@@ -3,25 +3,41 @@ import numpy as np
 from matk import Object, Radicle, Root, World
 from matk import communications
 from avstack.utils import IterationMonitor
-from avstack.geometry import NominalTransform
+from avstack.geometry import NominalOriginStandard, Transform, Translation, Rotation, transform_orientation
+
+def random_pose(extent, origin):
+    x = np.array([random.uniform(ext[0], ext[1]) if ext[0]<ext[1] else ext[0] for ext in extent])
+    q = transform_orientation(np.random.uniform(0, 2*np.pi, 3), 'euler', 'quat')
+    loc = Translation(x, origin)
+    rot = Rotation(q, origin)
+    pose = Transform(rot, loc)
+    return pose
 
 
-if __name__ == "__main__":
-    dt = 0.10
-    world = World(dt=dt)
-    default_pose = NominalTransform
+def main():
+    # ===================================================
+    # Scenario Parameters
+    # ===================================================
+    extent = [[0, 100], [0, 100], [0, 0]]  # x, y, z
+    vmax = 5  # m/s
+    dt = 0.10  # seconds
 
-    # -- spawn objects
+    # -- set up world
+    world = World(dt=dt, extent=extent)
+
+    # -- spawn objects randomly
     n_objects = 10
     for _ in range(n_objects):
-        obj = Object()
+        pose = random_pose(extent=extent, origin=NominalOriginStandard)
+        world.add_object(Object(pose=pose))
 
     # -- spawn radicle agents
     n_radicles = 5
     radicles = []
     for _ in range(n_radicles):
+        pose = random_pose(extent=extent, origin=NominalOriginStandard)
         rad = Radicle(
-            pose=default_pose,
+            pose=pose,
             comms=communications.Omnidirectional(max_range=np.inf),
             do_fuse=False,
             world=world,
@@ -29,9 +45,10 @@ if __name__ == "__main__":
         radicles.append(rad)
         world.add_agent(rad)
 
-    # -- spawn root agent    
+    # -- spawn root agent  
+    pose = random_pose(extent=extent, origin=NominalOriginStandard)
     root = Root(
-        pose=default_pose,
+        pose=pose,
         comms=communications.Omnidirectional(max_range=np.inf),
         do_fuse=True,
         world=world,
@@ -71,3 +88,7 @@ if __name__ == "__main__":
         root.plan()
         root.move()
         monitor.tick()
+
+
+if __name__ == "__main__":
+    main()

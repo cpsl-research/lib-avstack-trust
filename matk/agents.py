@@ -4,8 +4,9 @@ import itertools
 class Object:
     _ids = itertools.count()
 
-    def __init__(self) -> None:
+    def __init__(self, pose) -> None:
         self.ID = next(Object._ids)
+        self.pose = pose
 
     def tick(self, dt):
         self.move()
