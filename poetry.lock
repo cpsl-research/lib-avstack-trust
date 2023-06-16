@@ -4552,7 +4552,7 @@ telegram = ["requests"]
 [[package]]
 name = "trackeval"
 version = "1.0.dev1"
-description = ""
+description = "Code for evaluating object tracking"
 category = "main"
 optional = false
 python-versions = "*"
