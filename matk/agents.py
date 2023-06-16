@@ -4,15 +4,15 @@ import itertools
 class Object:
     _ids = itertools.count()
 
-    def __init__(self, pose) -> None:
+    def __init__(self, pose, twist, motion) -> None:
         self.ID = next(Object._ids)
         self.pose = pose
+        self.twist = twist
+        self.motion = motion
 
     def tick(self, dt):
-        self.move()
-
-    def move(self):
-        pass
+        self.pose, self.twist = \
+            self.motion.tick(self.pose, self.twist, dt)
 
 
 class Agent:
@@ -29,7 +29,7 @@ class Agent:
 
     @property
     def position(self):
-        return self.pose.translation
+        return self.pose.position
 
     @property
     def rotation(self):

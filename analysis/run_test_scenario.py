@@ -1,17 +1,22 @@
 import random
 import numpy as np
 from matk import Object, Radicle, Root, World
-from matk import communications
+from matk import communications, motion
 from avstack.utils import IterationMonitor
-from avstack.geometry import NominalOriginStandard, Transform, Translation, Rotation, transform_orientation
+from avstack.geometry import NominalOriginStandard, Pose, Twist, VectorDirMag, Translation, Rotation, transform_orientation
 
-def random_pose(extent, origin):
+
+def random_pose_twist(extent, origin):
     x = np.array([random.uniform(ext[0], ext[1]) if ext[0]<ext[1] else ext[0] for ext in extent])
     q = transform_orientation(np.random.uniform(0, 2*np.pi, 3), 'euler', 'quat')
     loc = Translation(x, origin)
     rot = Rotation(q, origin)
-    pose = Transform(rot, loc)
-    return pose
+    pose = Pose(loc, rot)
+    v = max(-5, min(5, 2*np.random.randn()))
+    linear = VectorDirMag(v*rot.forward_vector, origin)
+    angular = VectorDirMag(np.zeros((3,)), origin)
+    twist = Twist(linear, angular)
+    return pose, twist
 
 
 def main():
@@ -21,6 +26,7 @@ def main():
     extent = [[0, 100], [0, 100], [0, 0]]  # x, y, z
     vmax = 5  # m/s
     dt = 0.10  # seconds
+    obj_motion_model = motion.ConstantSpeedMarkovTurn()
 
     # -- set up world
     world = World(dt=dt, extent=extent)
@@ -28,14 +34,19 @@ def main():
     # -- spawn objects randomly
     n_objects = 10
     for _ in range(n_objects):
-        pose = random_pose(extent=extent, origin=NominalOriginStandard)
-        world.add_object(Object(pose=pose))
+        pose, twist = random_pose_twist(extent=extent, origin=NominalOriginStandard)
+        obj = Object(
+            pose=pose,
+            twist=twist,
+            motion=obj_motion_model,
+        )
+        world.add_object(obj)
 
     # -- spawn radicle agents
     n_radicles = 5
     radicles = []
     for _ in range(n_radicles):
-        pose = random_pose(extent=extent, origin=NominalOriginStandard)
+        pose, twist = random_pose_twist(extent=extent, origin=NominalOriginStandard)
         rad = Radicle(
             pose=pose,
             comms=communications.Omnidirectional(max_range=np.inf),
@@ -46,7 +57,7 @@ def main():
         world.add_agent(rad)
 
     # -- spawn root agent  
-    pose = random_pose(extent=extent, origin=NominalOriginStandard)
+    pose, twist = random_pose_twist(extent=extent, origin=NominalOriginStandard)
     root = Root(
         pose=pose,
         comms=communications.Omnidirectional(max_range=np.inf),
