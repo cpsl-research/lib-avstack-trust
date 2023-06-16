@@ -1,7 +1,10 @@
+import sys
 import random
 import numpy as np
+
+from PyQt5 import QtCore, QtWidgets
 from matk import Object, Radicle, Root, World
-from matk import communications, motion
+from matk import communications, motion, display
 from avstack.utils import IterationMonitor
 from avstack.geometry import NominalOriginStandard, Pose, Twist, VectorDirMag, Translation, Rotation, transform_orientation
 
@@ -19,87 +22,96 @@ def random_pose_twist(extent, origin):
     return pose, twist
 
 
-def main():
-    # ===================================================
-    # Scenario Parameters
-    # ===================================================
-    extent = [[0, 100], [0, 100], [0, 0]]  # x, y, z
-    vmax = 5  # m/s
-    dt = 0.10  # seconds
-    obj_motion_model = motion.ConstantSpeedMarkovTurn()
+class MainThread(QtCore.QThread):
+    signal = QtCore.pyqtSignal(object, object)
 
-    # -- set up world
-    world = World(dt=dt, extent=extent)
+    def run(self):
+        # ===================================================
+        # Scenario Parameters
+        # ===================================================
+        vmax = 5  # m/s
+        dt = 0.10  # seconds
+        obj_motion_model = motion.ConstantSpeedMarkovTurn()
 
-    # -- spawn objects randomly
-    n_objects = 10
-    for _ in range(n_objects):
+        # -- set up world
+        world = World(dt=dt, extent=extent)
+
+        # -- spawn objects randomly
+        n_objects = 10
+        for _ in range(n_objects):
+            pose, twist = random_pose_twist(extent=extent, origin=NominalOriginStandard)
+            obj = Object(
+                pose=pose,
+                twist=twist,
+                motion=obj_motion_model,
+            )
+            world.add_object(obj)
+
+        # -- spawn radicle agents
+        n_radicles = 5
+        radicles = []
+        for _ in range(n_radicles):
+            pose, twist = random_pose_twist(extent=extent, origin=NominalOriginStandard)
+            rad = Radicle(
+                pose=pose,
+                comms=communications.Omnidirectional(max_range=np.inf),
+                do_fuse=False,
+                world=world,
+            )
+            radicles.append(rad)
+            world.add_agent(rad)
+
+        # -- spawn root agent  
         pose, twist = random_pose_twist(extent=extent, origin=NominalOriginStandard)
-        obj = Object(
-            pose=pose,
-            twist=twist,
-            motion=obj_motion_model,
-        )
-        world.add_object(obj)
-
-    # -- spawn radicle agents
-    n_radicles = 5
-    radicles = []
-    for _ in range(n_radicles):
-        pose, twist = random_pose_twist(extent=extent, origin=NominalOriginStandard)
-        rad = Radicle(
+        root = Root(
             pose=pose,
             comms=communications.Omnidirectional(max_range=np.inf),
-            do_fuse=False,
+            do_fuse=True,
             world=world,
         )
-        radicles.append(rad)
-        world.add_agent(rad)
+        world.add_agent(root)
 
-    # -- spawn root agent  
-    pose, twist = random_pose_twist(extent=extent, origin=NominalOriginStandard)
-    root = Root(
-        pose=pose,
-        comms=communications.Omnidirectional(max_range=np.inf),
-        do_fuse=True,
-        world=world,
-    )
-    world.add_agent(root)
+        # -- run world loop
+        # ====================================================================
+        # NOTE: this type of world loop only works if the radicle agents
+        # are not fusing information between each other. In that context,
+        # we will need to solve the track inception problem - meaning,
+        # without having sent any tracks, who is the first to establish tracks?
+        # ====================================================================
+        monitor = IterationMonitor(sim_dt=dt, print_method="real_time", print_rate=1/2)
+        while True:
+            world.tick()
 
-    # -- run world loop
-    # ====================================================================
-    # NOTE: this type of world loop only works if the radicle agents
-    # are not fusing information between each other. In that context,
-    # we will need to solve the track inception problem - meaning,
-    # without having sent any tracks, who is the first to establish tracks?
-    # ====================================================================
-    monitor = IterationMonitor(sim_dt=dt, print_method="real_time", print_rate=1/2)
-    while True:
-        world.tick()
+            # Radicles first update their own states and communicate
+            # Randomize the order to prevent ordering bias
+            random.shuffle(radicles)
+            for rad in radicles:
+                detections = rad.observe()
+                rad.track(detections)
+                rad.send()
 
-        # Radicles first update their own states and communicate
-        # Randomize the order to prevent ordering bias
-        random.shuffle(radicles)
-        for rad in radicles:
-            detections = rad.observe()
-            rad.track(detections)
-            rad.send()
+            # Root agent will receive radicle observations
+            detections = root.observe()
+            tracks = root.receive()
 
-        # Root agent will receive radicle observations
-        detections = root.observe()
-        tracks = root.receive()
+            # Then root will fuse detections and tracks
+            root.fuse(detections, tracks)
 
-        # Then root will fuse detections and tracks
-        root.fuse(detections, tracks)
+            # Now, all agents perform planning and movements
+            for rad in radicles:
+                rad.plan()
+                rad.move()
+            root.plan()
+            root.move()
+            monitor.tick()
 
-        # Now, all agents perform planning and movements
-        for rad in radicles:
-            rad.plan()
-            rad.move()
-        root.plan()
-        root.move()
-        monitor.tick()
+            # Update display
+            self.signal.emit(world.objects, world.agents)
 
 
 if __name__ == "__main__":
-    main()
+    extent = [[0, 100], [0, 100], [0, 0]]  # x, y, z
+
+    app = QtWidgets.QApplication(sys.argv)
+    window = display.MainWindow(extent=extent, thread=MainThread())
+    app.exec_()

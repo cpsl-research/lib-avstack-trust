@@ -10,6 +10,18 @@ class Object:
         self.twist = twist
         self.motion = motion
 
+    @property
+    def position(self):
+        return self.pose.position
+    
+    @property
+    def rotation(self):
+        return self.pose.rotation
+    
+    @property
+    def velocity(self):
+        return self.twist.linear
+
     def tick(self, dt):
         self.pose, self.twist = \
             self.motion.tick(self.pose, self.twist, dt)
