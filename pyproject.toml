@@ -1,0 +1,41 @@
+[tool.poetry]
+name = "multi-agent-trust-kalman"
+version = "0.1.0-alpha.1"
+description = "Prototyping Kalman filters for multi-agent trust modeling"
+authors = ["Spencer Hallyburton <spencer.hallyburton@duke.edu>"]
+readme = "README.md"
+license = "MIT"
+repository = "https://github.com/cpsl-research/multi-agent-trust-kalman"
+keywords = ["security", "autonomy", "kalman filter", "trust"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+]
+
+[tool.poetry.dependencies]
+python = "~3.8"
+lib-avstack-api = { path = "submodules/lib-avstack-api", develop = true }
+lib-avstack-core = { path = "submodules/lib-avstack-core", develop = true }
+
+[tool.poetry.group.test.dependencies]
+pytest = "^7"
+pytest-cov = "^4"
+bandit = "^1.7"
+black = "~22.12.0"
+mypy = "^0"
+isort = "^5.11"
+flake8 = "^5.0"
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q -s"
+testpaths = [
+    "tests",
+    "integration",
+]
+
+[build-system]
+requires = [
+    "poetry-core",
+]
+build-backend = "poetry.core.masonry.api"
