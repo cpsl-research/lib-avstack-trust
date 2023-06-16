@@ -1,4 +1,4 @@
-NAME := multi-agent-trust-kalman
+NAME := matk
 INSTALL_STAMP := .install.stamp
 POETRY := $(shell command -v poetry 2> /dev/null)
 .DEFAULT_GOAL := help

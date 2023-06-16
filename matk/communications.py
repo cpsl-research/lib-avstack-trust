@@ -1,6 +1,4 @@
-
-
-class CommsModel():
+class CommsModel:
     def __init__(self, max_range) -> None:
         self.max_range = max_range
 
