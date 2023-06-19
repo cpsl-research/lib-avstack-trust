@@ -1,6 +1,7 @@
 import sys
 import random
 import numpy as np
+import time
 
 from PyQt5 import QtCore, QtWidgets
 from matk import Object, Radicle, Root, World
@@ -31,7 +32,7 @@ class MainThread(QtCore.QThread):
         # ===================================================
         vmax = 5  # m/s
         dt = 0.10  # seconds
-        obj_motion_model = motion.ConstantSpeedMarkovTurn()
+        obj_motion_model = motion.ConstantSpeedMarkovTurn(extent=extent)
 
         # -- set up world
         world = World(dt=dt, extent=extent)
@@ -107,10 +108,12 @@ class MainThread(QtCore.QThread):
 
             # Update display
             self.signal.emit(world.objects, world.agents)
+            time.sleep(sleeps)
 
 
 if __name__ == "__main__":
     extent = [[0, 100], [0, 100], [0, 0]]  # x, y, z
+    sleeps = 0.02
 
     app = QtWidgets.QApplication(sys.argv)
     window = display.MainWindow(extent=extent, thread=MainThread())

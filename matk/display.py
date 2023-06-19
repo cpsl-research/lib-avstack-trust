@@ -57,9 +57,9 @@ class MainWindow(QtWidgets.QMainWindow):
     def update_plot(self):
         # Note: we no longer need to clear the axis.
         if self._plot_ref is None:
-            # First time we have no plot reference, so do a normal plot.
-            # .plot returns a list of line <reference>s, as we're
-            # only getting one we can take the first element.
+            self.canvas.axes.clear()
+            self.canvas.axes.set_xlim(*self.extent[0])
+            self.canvas.axes.set_ylim(*self.extent[1])
 
             # -- plot objects
             for obj_ID, obj in self.objects.items():
