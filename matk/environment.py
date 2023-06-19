@@ -6,11 +6,13 @@ class World:
         self.objects = {}
         self.agents = {}
         self.tracks = {}
+        self.frame = 0
         self.t = 0
         self.dt = dt
         self.extent = extent
 
     def tick(self):
+        self.frame += 1
         self.t += self.dt
         for obj in self.objects.values():
             obj.tick(self.dt)

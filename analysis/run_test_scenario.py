@@ -10,13 +10,17 @@ from avstack.utils import IterationMonitor
 from avstack.geometry import NominalOriginStandard, Pose, Twist, VectorDirMag, Translation, Rotation, transform_orientation
 
 
-def random_pose_twist(extent, origin):
+def random_pose_twist(extent, origin, vmin=2, vmax=5, vsig=2):
     x = np.array([random.uniform(ext[0], ext[1]) if ext[0]<ext[1] else ext[0] for ext in extent])
     q = transform_orientation(np.random.uniform(0, 2*np.pi, 3), 'euler', 'quat')
     loc = Translation(x, origin)
     rot = Rotation(q, origin)
     pose = Pose(loc, rot)
-    v = max(-5, min(5, 2*np.random.randn()))
+    v = vsig*np.random.randn()
+    if abs(v) > vmax:
+        v = np.sign(v) * vmax
+    elif abs(v) < vmin:
+        v = np.sign(v) * vmin
     linear = VectorDirMag(v*rot.forward_vector, origin)
     angular = VectorDirMag(np.zeros((3,)), origin)
     twist = Twist(linear, angular)
@@ -24,21 +28,18 @@ def random_pose_twist(extent, origin):
 
 
 class MainThread(QtCore.QThread):
-    signal = QtCore.pyqtSignal(object, object)
+    signal = QtCore.pyqtSignal(int, float, object, object)
 
-    def run(self):
+    def run(self, dt=0.1, n_objects=10, n_radicles=5, print_method="real_time", print_rate=1/2):
         # ===================================================
         # Scenario Parameters
         # ===================================================
-        vmax = 5  # m/s
-        dt = 0.10  # seconds
         obj_motion_model = motion.ConstantSpeedMarkovTurn(extent=extent)
 
         # -- set up world
         world = World(dt=dt, extent=extent)
 
         # -- spawn objects randomly
-        n_objects = 10
         for _ in range(n_objects):
             pose, twist = random_pose_twist(extent=extent, origin=NominalOriginStandard)
             obj = Object(
@@ -49,7 +50,6 @@ class MainThread(QtCore.QThread):
             world.add_object(obj)
 
         # -- spawn radicle agents
-        n_radicles = 5
         radicles = []
         for _ in range(n_radicles):
             pose, twist = random_pose_twist(extent=extent, origin=NominalOriginStandard)
@@ -79,7 +79,7 @@ class MainThread(QtCore.QThread):
         # we will need to solve the track inception problem - meaning,
         # without having sent any tracks, who is the first to establish tracks?
         # ====================================================================
-        monitor = IterationMonitor(sim_dt=dt, print_method="real_time", print_rate=1/2)
+        monitor = IterationMonitor(sim_dt=dt, print_method=print_method, print_rate=print_rate)
         while True:
             world.tick()
 
@@ -107,7 +107,7 @@ class MainThread(QtCore.QThread):
             monitor.tick()
 
             # Update display
-            self.signal.emit(world.objects, world.agents)
+            self.signal.emit(world.frame, world.t, world.objects, world.agents)
             time.sleep(sleeps)
 
 
