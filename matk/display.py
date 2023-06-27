@@ -1,23 +1,25 @@
 import os
+
 #################################################################
 # NOTE: These two lines are VERY IMPORTANT -- they ensure qt
 # uses its own path to the graphics plugins and not the cv2 path
 import cv2
+
+
 os.environ.pop("QT_QPA_PLATFORM_PLUGIN_PATH")
 #################################################################
 
 import matplotlib
-matplotlib.use('Qt5Agg')
-from matplotlib.lines import Line2D
 
-from PyQt5 import QtCore, QtWidgets
 
+matplotlib.use("Qt5Agg")
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
+from matplotlib.lines import Line2D
+from PyQt5 import QtCore, QtWidgets
 
 
 class MplCanvas(FigureCanvasQTAgg):
-
     def __init__(self, parent=None, width=10, height=8, dpi=100):
         fig = Figure(figsize=(width, height), dpi=dpi)
         self.axes = fig.add_subplot(111)
@@ -25,7 +27,6 @@ class MplCanvas(FigureCanvasQTAgg):
 
 
 class MainWindow(QtWidgets.QMainWindow):
-
     def __init__(self, extent, thread, *args, **kwargs):
         super(MainWindow, self).__init__(*args, **kwargs)
         self._thread = thread
@@ -61,7 +62,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.objects = objects
         self.agents = agents
 
-    def update_plot(self, obj_color='y', radicle_color='r', root_color='g'):
+    def update_plot(self, obj_color="y", radicle_color="r", root_color="g"):
         # -- clear axes and set lims
         for pt in self.pts:
             pt.remove()
@@ -70,26 +71,62 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # -- plot objects
         for obj_ID, obj in self.objects.items():
-            self.pts.extend(self.canvas.axes.plot(obj.position.x, obj.position.y, obj_color+'o'))
+            self.pts.extend(
+                self.canvas.axes.plot(obj.position.x[0], obj.position.x[1], obj_color + "o")
+            )
 
         # -- plot agents
         for agent_ID, agent in self.agents.items():
             if agent.is_root:
-                self.pts.extend(self.canvas.axes.plot(agent.position.x, agent.position.y, root_color+'o'))
+                self.pts.extend(
+                    self.canvas.axes.plot(
+                        agent.position.x[0], agent.position.x[1], root_color + "o"
+                    )
+                )
             else:
-                self.pts.extend(self.canvas.axes.plot(agent.position.x, agent.position.y, radicle_color+'o'))
+                self.pts.extend(
+                    self.canvas.axes.plot(
+                        agent.position.x[0], agent.position.x[1], radicle_color + "o"
+                    )
+                )
 
         # -- legend
         if not self.initialized:
             self.canvas.axes.set_xlim(*self.extent[0])
             self.canvas.axes.set_ylim(*self.extent[1])
-            obj_point = Line2D([0], [0], label='Object', marker='s', markersize=10, 
-                 markeredgecolor=obj_color, markerfacecolor=obj_color, linestyle='')
-            rad_point = Line2D([0], [0], label='Radicle', marker='s', markersize=10, 
-                markeredgecolor=radicle_color, markerfacecolor=radicle_color, linestyle='')
-            root_point = Line2D([0], [0], label='Root', marker='s', markersize=10, 
-                markeredgecolor=root_color, markerfacecolor=root_color, linestyle='')
-            self.canvas.axes.legend(handles=[obj_point, rad_point, root_point], loc="upper right")
+            obj_point = Line2D(
+                [0],
+                [0],
+                label="Object",
+                marker="s",
+                markersize=10,
+                markeredgecolor=obj_color,
+                markerfacecolor=obj_color,
+                linestyle="",
+            )
+            rad_point = Line2D(
+                [0],
+                [0],
+                label="Radicle",
+                marker="s",
+                markersize=10,
+                markeredgecolor=radicle_color,
+                markerfacecolor=radicle_color,
+                linestyle="",
+            )
+            root_point = Line2D(
+                [0],
+                [0],
+                label="Root",
+                marker="s",
+                markersize=10,
+                markeredgecolor=root_color,
+                markerfacecolor=root_color,
+                linestyle="",
+            )
+            self.canvas.axes.legend(
+                handles=[obj_point, rad_point, root_point], loc="upper right"
+            )
             self.initialized = True
 
         # Trigger the canvas to update and redraw.

@@ -36,7 +36,7 @@ lint: $(INSTALL_STAMP)
 
 .PHONY: format
 format: $(INSTALL_STAMP)
-		$(POETRY) run isort --profile=black --lines-after-imports=2 ./tests/ $(NAME)
+		$(POETRY) run isort --profile=black --lines-after-imports=2 ./tests/ $(NAME) ./analysis/
 		$(POETRY) run black ./tests/ $(NAME)
 
 .PHONY: test

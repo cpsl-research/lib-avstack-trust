@@ -10,7 +10,7 @@ class MotionModel:
         pose, twist = self._tick(pose, twist, dt)
         pose, twist = self.constrain(pose, twist)
         return pose, twist
-    
+
     def constrain(self, pose, twist, do_z=False):
         """Constrain the motion of the object to stay within the extent
 
@@ -21,16 +21,16 @@ class MotionModel:
             for dim in range(max_dim):
                 if pose.position[dim] <= self.extent[dim][0]:
                     pose.position[dim] = self.extent[dim][0]
-                    dq = transform_orientation([0, 0, np.pi/2], 'euler', 'quat')
-                    pose.rotation.q = dq * pose.rotation.q
+                    dq = transform_orientation([0, 0, np.pi / 2], "euler", "quat")
+                    pose.attitude.q = dq * pose.attitude.q
                     speed = twist.linear.norm()
-                    twist.linear.vector = speed * pose.rotation.forward_vector
+                    twist.linear.vector = speed * pose.attitude.forward_vector
                 elif pose.position[dim] > self.extent[dim][1]:
                     pose.position[dim] = self.extent[dim][1]
-                    dq = transform_orientation([0, 0, np.pi/2], 'euler', 'quat')
-                    pose.rotation.q = dq * pose.rotation.q
+                    dq = transform_orientation([0, 0, np.pi / 2], "euler", "quat")
+                    pose.attitude.q = dq * pose.attitude.q
                     speed = twist.linear.norm()
-                    twist.linear.vector = speed * pose.rotation.forward_vector
+                    twist.linear.vector = speed * pose.attitude.forward_vector
         return pose, twist
 
 
@@ -45,11 +45,11 @@ class ConstantSpeedMarkovTurn(MotionModel):
     def _tick(self, pose, twist, dt):
         """Velocity stays the same magnitude, small angle adjustments"""
         speed = twist.linear.norm()
-        deul = [dt*sig*np.random.randn() for sig in self.sigmas]
-        dq = transform_orientation(deul, 'euler', 'quat')
-        pose.rotation.q = dq * pose.rotation.q
-        new_velocity = speed * pose.rotation.forward_vector
-        pose.position = pose.position + dt*(new_velocity + twist.linear)/2
+        deul = [dt * sig * np.random.randn() for sig in self.sigmas]
+        dq = transform_orientation(deul, "euler", "quat")
+        pose.attitude.q = dq * pose.attitude.q
+        new_velocity = speed * pose.attitude.forward_vector
+        pose.position = pose.position + dt * (new_velocity + twist.linear.x) / 2
         twist.linear.vector = new_velocity
         return pose, twist
 

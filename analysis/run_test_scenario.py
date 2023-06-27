@@ -1,28 +1,37 @@
-import sys
 import random
-import numpy as np
+import sys
 import time
 
-from PyQt5 import QtCore, QtWidgets
-from matk import Object, Radicle, Root, World
-from matk import communications, motion, display
+import numpy as np
+from avstack.geometry import (
+    GlobalOrigin3D,
+    Pose,
+    Position,
+    Attitude,
+    Twist,
+    Velocity,
+    AngularVelocity,
+    transform_orientation,
+)
 from avstack.utils import IterationMonitor
-from avstack.geometry import NominalOriginStandard, Pose, Twist, VectorDirMag, Translation, Rotation, transform_orientation
+from PyQt5 import QtCore, QtWidgets
+
+from matk import Object, Radicle, Root, World, communications, display, motion
 
 
-def random_pose_twist(extent, origin, vmin=2, vmax=5, vsig=2):
+def random_pose_twist(extent, reference, vmin=2, vmax=5, vsig=2):
     x = np.array([random.uniform(ext[0], ext[1]) if ext[0]<ext[1] else ext[0] for ext in extent])
     q = transform_orientation(np.random.uniform(0, 2*np.pi, 3), 'euler', 'quat')
-    loc = Translation(x, origin)
-    rot = Rotation(q, origin)
+    loc = Position(x, reference)
+    rot = Attitude(q, reference)
     pose = Pose(loc, rot)
     v = vsig*np.random.randn()
     if abs(v) > vmax:
         v = np.sign(v) * vmax
     elif abs(v) < vmin:
         v = np.sign(v) * vmin
-    linear = VectorDirMag(v*rot.forward_vector, origin)
-    angular = VectorDirMag(np.zeros((3,)), origin)
+    linear = Velocity(v*rot.forward_vector, reference)
+    angular = AngularVelocity(np.quaternion(1), reference)
     twist = Twist(linear, angular)
     return pose, twist
 
@@ -41,7 +50,7 @@ class MainThread(QtCore.QThread):
 
         # -- spawn objects randomly
         for _ in range(n_objects):
-            pose, twist = random_pose_twist(extent=extent, origin=NominalOriginStandard)
+            pose, twist = random_pose_twist(extent=extent, reference=GlobalOrigin3D)
             obj = Object(
                 pose=pose,
                 twist=twist,
@@ -52,7 +61,7 @@ class MainThread(QtCore.QThread):
         # -- spawn radicle agents
         radicles = []
         for _ in range(n_radicles):
-            pose, twist = random_pose_twist(extent=extent, origin=NominalOriginStandard)
+            pose, twist = random_pose_twist(extent=extent, reference=GlobalOrigin3D)
             rad = Radicle(
                 pose=pose,
                 comms=communications.Omnidirectional(max_range=np.inf),
@@ -63,7 +72,7 @@ class MainThread(QtCore.QThread):
             world.add_agent(rad)
 
         # -- spawn root agent  
-        pose, twist = random_pose_twist(extent=extent, origin=NominalOriginStandard)
+        pose, twist = random_pose_twist(extent=extent, reference=GlobalOrigin3D)
         root = Root(
             pose=pose,
             comms=communications.Omnidirectional(max_range=np.inf),
