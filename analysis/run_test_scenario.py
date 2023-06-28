@@ -19,9 +19,9 @@ from PyQt5 import QtCore, QtWidgets
 from matk import Object, Radicle, Root, World, communications, display, motion
 
 
-def random_pose_twist(extent, reference, vmin=2, vmax=5, vsig=2):
-    x = np.array([random.uniform(ext[0], ext[1]) if ext[0]<ext[1] else ext[0] for ext in extent])
-    q = transform_orientation(np.random.uniform(0, 2*np.pi, 3), 'euler', 'quat')
+def random_pose_twist(extent, reference, vmin=2, vmax=5, vsig=2, buffer=10):
+    x = np.array([random.uniform(ext[0]+buffer, ext[1]-buffer) if ext[0]<ext[1] else ext[0] for ext in extent])
+    q = transform_orientation([0, 0, np.random.uniform(0, 2*np.pi)], 'euler', 'quat')
     loc = Position(x, reference)
     rot = Attitude(q, reference)
     pose = Pose(loc, rot)
@@ -38,6 +38,9 @@ def random_pose_twist(extent, reference, vmin=2, vmax=5, vsig=2):
 
 class MainThread(QtCore.QThread):
     signal = QtCore.pyqtSignal(int, float, object, object)
+
+    seed = 1
+    np.random.seed(seed)
 
     def run(self, dt=0.1, n_objects=10, n_radicles=5, print_method="real_time", print_rate=1/2):
         # ===================================================
@@ -89,6 +92,7 @@ class MainThread(QtCore.QThread):
         # without having sent any tracks, who is the first to establish tracks?
         # ====================================================================
         monitor = IterationMonitor(sim_dt=dt, print_method=print_method, print_rate=print_rate)
+        i_iter = 0
         while True:
             world.tick()
 

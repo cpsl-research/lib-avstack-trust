@@ -16,26 +16,39 @@ class MotionModel:
 
         The velocity update is slightly buggy. Fix later.
         """
+        if do_z:
+            raise NotImplementedError("Have not implemented z constraint")
         if self.extent is not None:
-            max_dim = 3 if do_z else 2
-            for dim in range(max_dim):
-                if pose.position[dim] <= self.extent[dim][0]:
-                    pose.position[dim] = self.extent[dim][0]
-                    dq = transform_orientation([0, 0, np.pi / 2], "euler", "quat")
-                    pose.attitude.q = dq * pose.attitude.q
-                    speed = twist.linear.norm()
-                    twist.linear.vector = speed * pose.attitude.forward_vector
-                elif pose.position[dim] > self.extent[dim][1]:
-                    pose.position[dim] = self.extent[dim][1]
-                    dq = transform_orientation([0, 0, np.pi / 2], "euler", "quat")
-                    pose.attitude.q = dq * pose.attitude.q
-                    speed = twist.linear.norm()
-                    twist.linear.vector = speed * pose.attitude.forward_vector
+            adjust = True
+            # run into left wall
+            if pose.position[0] < self.extent[0][0]:
+                pose.position[0] = self.extent[0][0]
+                vel_mult = [-1, 1]
+            # run into right wall
+            elif pose.position[0] > self.extent[0][1]:
+                pose.position[0] = self.extent[0][1]
+                vel_mult = [-1, 1]
+            # run into bottom wall
+            elif pose.position[1] < self.extent[1][0]:
+                pose.position[1] = self.extent[1][0]
+                vel_mult = [1, -1]
+            # run into top wall
+            elif pose.position[1] > self.extent[1][1]:
+                pose.position[1] = self.extent[1][1]
+                vel_mult = [1, -1]
+            else:
+                adjust = False
+            # make adjustments
+            if adjust:
+                twist.linear.x[0] *= vel_mult[0]
+                twist.linear.x[1] *= vel_mult[1]
+                yaw = -np.arctan2(twist.linear[1], twist.linear[0])  # negated bc this is passive transform (??)
+                pose.attitude.q = transform_orientation([0, 0, yaw], 'euler', 'quat')
         return pose, twist
 
 
 class ConstantSpeedMarkovTurn(MotionModel):
-    def __init__(self, extent, sigma_roll=0, sigma_pitch=0, sigma_yaw=1e-2) -> None:
+    def __init__(self, extent, sigma_roll=0, sigma_pitch=0, sigma_yaw=1) -> None:
         self.sigma_roll = sigma_roll
         self.sigma_pitch = sigma_pitch
         self.sigma_yaw = sigma_yaw
@@ -50,7 +63,7 @@ class ConstantSpeedMarkovTurn(MotionModel):
         pose.attitude.q = dq * pose.attitude.q
         new_velocity = speed * pose.attitude.forward_vector
         pose.position = pose.position + dt * (new_velocity + twist.linear.x) / 2
-        twist.linear.vector = new_velocity
+        twist.linear.x = new_velocity
         return pose, twist
 
 

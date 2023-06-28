@@ -127,6 +127,8 @@ class MainWindow(QtWidgets.QMainWindow):
             self.canvas.axes.legend(
                 handles=[obj_point, rad_point, root_point], loc="upper right"
             )
+            self.canvas.axes.set_xlabel('X (index 0)')
+            self.canvas.axes.set_ylabel('Y (index 1)')
             self.initialized = True
 
         # Trigger the canvas to update and redraw.
