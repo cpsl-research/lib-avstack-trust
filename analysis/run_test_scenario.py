@@ -67,6 +67,7 @@ class MainThread(QtCore.QThread):
             pose, twist = random_pose_twist(extent=extent, reference=GlobalOrigin3D)
             rad = Radicle(
                 pose=pose,
+                twist=twist,
                 comms=communications.Omnidirectional(max_range=np.inf),
                 do_fuse=False,
                 world=world,
@@ -78,6 +79,7 @@ class MainThread(QtCore.QThread):
         pose, twist = random_pose_twist(extent=extent, reference=GlobalOrigin3D)
         root = Root(
             pose=pose,
+            twist=twist,
             comms=communications.Omnidirectional(max_range=np.inf),
             do_fuse=True,
             world=world,
@@ -113,10 +115,10 @@ class MainThread(QtCore.QThread):
 
             # Now, all agents perform planning and movements
             for rad in radicles:
-                rad.plan()
-                rad.move()
-            root.plan()
-            root.move()
+                rad.plan(dt)
+                rad.move(dt)
+            root.plan(dt)
+            root.move(dt)
             monitor.tick()
 
             # Update display

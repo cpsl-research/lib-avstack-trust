@@ -42,7 +42,7 @@ class MotionModel:
             if adjust:
                 twist.linear.x[0] *= vel_mult[0]
                 twist.linear.x[1] *= vel_mult[1]
-                yaw = -np.arctan2(twist.linear[1], twist.linear[0])  # negated bc this is passive transform (??)
+                yaw = np.arctan2(twist.linear[1], twist.linear[0])  # negated bc this is passive transform (??)
                 pose.attitude.q = transform_orientation([0, 0, yaw], 'euler', 'quat')
         return pose, twist
 
@@ -60,6 +60,22 @@ class ConstantSpeedMarkovTurn(MotionModel):
         speed = twist.linear.norm()
         deul = [dt * sig * np.random.randn() for sig in self.sigmas]
         dq = transform_orientation(deul, "euler", "quat")
+        pose.attitude.q = dq * pose.attitude.q
+        new_velocity = speed * pose.attitude.forward_vector
+        pose.position = pose.position + dt * (new_velocity + twist.linear.x) / 2
+        twist.linear.x = new_velocity
+        return pose, twist
+
+
+class ConstantSpeedConstantTurn(MotionModel):
+    def __init__(self, extent, radius=10, **kwargs) -> None:
+        super().__init__(extent)
+        self.radius = radius
+
+    def _tick(self, pose, twist, dt):
+        speed = twist.linear.norm()
+        dyaw = speed * dt / self.radius
+        dq = transform_orientation([0, 0, dyaw], "euler", "quat")
         pose.attitude.q = dq * pose.attitude.q
         new_velocity = speed * pose.attitude.forward_vector
         pose.position = pose.position + dt * (new_velocity + twist.linear.x) / 2

@@ -1,4 +1,5 @@
 import itertools
+from matk.motion import ConstantSpeedConstantTurn
 
 
 class Object:
@@ -29,7 +30,7 @@ class Object:
 class Agent:
     _ids = itertools.count()
 
-    def __init__(self, pose, comms, do_fuse, world) -> None:
+    def __init__(self, pose, twist, comms, do_fuse, world) -> None:
         self.ID = next(Agent._ids)
         self.comms = comms
         self.do_fuse = do_fuse
@@ -37,6 +38,7 @@ class Agent:
         self.t = self.world.t
         self.tracks = []
         self.pose = pose
+        self.twist = twist
 
     @property
     def position(self):
@@ -45,6 +47,10 @@ class Agent:
     @property
     def rotation(self):
         return self.pose.rotation
+    
+    @property
+    def velocity(self):
+        return self.twist.linear
 
     def in_range(self, other):
         return self.comms.in_range(self, other)
@@ -69,12 +75,12 @@ class Agent:
     def fuse(self, detections, tracks):
         """Fuse information from other agents"""
 
-    def plan(self):
+    def plan(self, dt):
         """Plan a path based on the mission"""
 
-    def move(self):
+    def move(self, dt):
         """Move based on a planned path"""
-
+    
 
 class Radicle(Agent):
     """Untrusted agent
@@ -84,11 +90,13 @@ class Radicle(Agent):
 
     is_root = False
 
-    def __init__(self, pose, comms, do_fuse, world) -> None:
-        super().__init__(pose, comms, do_fuse, world)
+    def __init__(self, pose, twist, comms, do_fuse, world) -> None:
+        super().__init__(pose, twist, comms, do_fuse, world)
 
-    def plan(self):
-        pass
+    def move(self, dt):
+        # HACK for now
+        self.motion = ConstantSpeedConstantTurn(extent=self.world.extent, radius=5)
+        self.pose, self.twist = self.motion.tick(self.pose, self.twist, dt)
 
 
 class Root(Agent):
@@ -99,8 +107,8 @@ class Root(Agent):
 
     is_root = True
 
-    def __init__(self, pose, comms, do_fuse, world) -> None:
-        super().__init__(pose, comms, do_fuse, world)
+    def __init__(self, pose, twist, comms, do_fuse, world) -> None:
+        super().__init__(pose, twist, comms, do_fuse, world)
 
-    def plan(self):
+    def plan(self, dt):
         pass
