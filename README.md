@@ -13,3 +13,9 @@ git clone https://github.com/cpsl-research/multi-agent-trust-kalman --recurse-su
 poetry install
 ```
 
+
+## Run
+```
+cd analysis
+poetry run python run_test_scenario.py
+```
