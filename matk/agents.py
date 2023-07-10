@@ -30,7 +30,7 @@ class Object:
 class Agent:
     _ids = itertools.count()
 
-    def __init__(self, pose, twist, comms, do_fuse, world) -> None:
+    def __init__(self, pose, twist, comms, sensor, do_fuse, world) -> None:
         self.ID = next(Agent._ids)
         self.comms = comms
         self.do_fuse = do_fuse
@@ -39,6 +39,7 @@ class Agent:
         self.tracks = []
         self.pose = pose
         self.twist = twist
+        self.sensor = sensor
 
     @property
     def position(self):
@@ -58,8 +59,7 @@ class Agent:
     def observe(self):
         """Observe environment based on position and world"""
         self.t = self.world.t
-        detections = []
-        return detections
+        return self.sensor(self.world.frame, self.world.t, self.world.objects)
 
     def track(self, detections):
         """Run normal tracking on detections"""
@@ -87,11 +87,10 @@ class Radicle(Agent):
 
     Mission is to keep monitoring some subregion
     """
-
     is_root = False
 
-    def __init__(self, pose, twist, comms, do_fuse, world) -> None:
-        super().__init__(pose, twist, comms, do_fuse, world)
+    def __init__(self, pose, twist, comms, sensor, do_fuse, world) -> None:
+        super().__init__(pose, twist, comms, sensor, do_fuse, world)
 
     def move(self, dt):
         # HACK for now
@@ -107,8 +106,8 @@ class Root(Agent):
 
     is_root = True
 
-    def __init__(self, pose, twist, comms, do_fuse, world) -> None:
-        super().__init__(pose, twist, comms, do_fuse, world)
+    def __init__(self, pose, twist, comms, sensor, do_fuse, world) -> None:
+        super().__init__(pose, twist, comms, sensor, do_fuse, world)
 
     def plan(self, dt):
         pass

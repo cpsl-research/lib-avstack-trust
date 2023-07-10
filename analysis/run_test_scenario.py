@@ -5,6 +5,7 @@ import time
 import numpy as np
 from avstack.geometry import (
     GlobalOrigin3D,
+    ReferenceFrame,
     Pose,
     Position,
     Attitude,
@@ -16,7 +17,7 @@ from avstack.geometry import (
 from avstack.utils import IterationMonitor
 from PyQt5 import QtCore, QtWidgets
 
-from matk import Object, Radicle, Root, World, communications, display, motion
+from matk import Object, Radicle, Root, World, communications, display, motion, sensors
 
 
 def random_pose_twist(extent, reference, vmin=2, vmax=5, vsig=2, buffer=10):
@@ -33,7 +34,8 @@ def random_pose_twist(extent, reference, vmin=2, vmax=5, vsig=2, buffer=10):
     linear = Velocity(v*rot.forward_vector, reference)
     angular = AngularVelocity(np.quaternion(1), reference)
     twist = Twist(linear, angular)
-    return pose, twist
+    ref = ReferenceFrame(x=pose.position.x, v=twist.linear.x, q=pose.attitude.q, reference=reference)
+    return pose, twist, ref
 
 
 class MainThread(QtCore.QThread):
@@ -53,7 +55,7 @@ class MainThread(QtCore.QThread):
 
         # -- spawn objects randomly
         for _ in range(n_objects):
-            pose, twist = random_pose_twist(extent=extent, reference=GlobalOrigin3D)
+            pose, twist, ref = random_pose_twist(extent=extent, reference=GlobalOrigin3D)
             obj = Object(
                 pose=pose,
                 twist=twist,
@@ -64,23 +66,29 @@ class MainThread(QtCore.QThread):
         # -- spawn radicle agents
         radicles = []
         for _ in range(n_radicles):
-            pose, twist = random_pose_twist(extent=extent, reference=GlobalOrigin3D)
+            pose, twist, ref = random_pose_twist(extent=extent, reference=GlobalOrigin3D)
+            sensor_radicle = sensors.PositionSensor(ref, noise=[0, 0, 0],
+                                                    extent=extent, fov=[30, np.pi/180*30, np.pi])
             rad = Radicle(
                 pose=pose,
                 twist=twist,
                 comms=communications.Omnidirectional(max_range=np.inf),
+                sensor=sensor_radicle,
                 do_fuse=False,
                 world=world,
             )
             radicles.append(rad)
             world.add_agent(rad)
 
-        # -- spawn root agent  
-        pose, twist = random_pose_twist(extent=extent, reference=GlobalOrigin3D)
+        # -- spawn root agent
+        pose, twist, ref = random_pose_twist(extent=extent, reference=GlobalOrigin3D)
+        sensor_root = sensors.PositionSensor(ref, noise=[0, 0, 0],
+                                             extent=extent, fov=[30, np.pi/180*30, np.pi])
         root = Root(
             pose=pose,
             twist=twist,
             comms=communications.Omnidirectional(max_range=np.inf),
+            sensor=sensor_root,
             do_fuse=True,
             world=world,
         )
