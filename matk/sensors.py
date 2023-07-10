@@ -3,7 +3,7 @@ import numpy as np
 from avstack.geometry.transformations import cartesian_to_spherical
 from avstack.datastructs import DataContainer
 from avstack.geometry import GlobalOrigin3D, Position
-from avstack.modules.perception.detections import CentroidDetection
+from avstack.modules.perception.detections import RazDetection
 
 
 class SensorModel():
@@ -68,9 +68,10 @@ class PositionSensor(SensorModel):
             obj = obj.position
         obj = obj.change_reference(self.reference, inplace=False)
         xyz = obj.x + self.noise * np.random.randn(3) if noisy else obj.x
-        detection = CentroidDetection(
+        razel = cartesian_to_spherical(xyz)
+        detection = RazDetection(
             source_identifier=sensor.ID,
-            centroid=xyz,
+            raz=razel[:2],
             reference=self.reference,
         )
         return detection

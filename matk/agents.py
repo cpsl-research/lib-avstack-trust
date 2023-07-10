@@ -1,5 +1,6 @@
 import itertools
 from matk.motion import ConstantSpeedConstantTurn
+from avstack.geometry import ReferenceFrame, GlobalOrigin3D
 
 
 class Object:
@@ -30,16 +31,17 @@ class Object:
 class Agent:
     _ids = itertools.count()
 
-    def __init__(self, pose, twist, comms, sensor, do_fuse, world) -> None:
+    def __init__(self, pose, twist, comms, sensor, tracker, fusion, do_fuse, world) -> None:
         self.ID = next(Agent._ids)
         self.comms = comms
         self.do_fuse = do_fuse
         self.world = world
         self.t = self.world.t
-        self.tracks = []
         self.pose = pose
         self.twist = twist
         self.sensor = sensor
+        self.tracker = tracker
+        self.fusion = fusion
 
     @property
     def position(self):
@@ -52,6 +54,10 @@ class Agent:
     @property
     def velocity(self):
         return self.twist.linear
+    
+    def as_reference(self):
+        return ReferenceFrame(x=self.position.x, v=self.velocity.x,
+                              q=self.rotation.q, reference=self.position.reference)
 
     def in_range(self, other):
         return self.comms.in_range(self, other)
@@ -63,17 +69,20 @@ class Agent:
 
     def track(self, detections):
         """Run normal tracking on detections"""
+        return self.tracker(frame=self.world.frame, t=self.world.t,
+                            detections=detections, platform=GlobalOrigin3D)
 
-    def send(self):
-        self.world.receive_tracks(self.t, self.ID, self.tracks)
+    def send(self, tracks):
+        self.world.receive_tracks(self.t, self.ID, tracks)
 
     def receive(self):
         """Send information out into the world, receive world information"""
         tracks = self.world.send_tracks(self.t, self.ID)
         return tracks
 
-    def fuse(self, detections, tracks):
+    def fuse(self, tracks_self, tracks_other):
         """Fuse information from other agents"""
+        return self.fusion(tracks_self=tracks_self, tracks_other=tracks_other)
 
     def plan(self, dt):
         """Plan a path based on the mission"""
@@ -89,8 +98,8 @@ class Radicle(Agent):
     """
     is_root = False
 
-    def __init__(self, pose, twist, comms, sensor, do_fuse, world) -> None:
-        super().__init__(pose, twist, comms, sensor, do_fuse, world)
+    def __init__(self, pose, twist, comms, sensor, tracker, fusion, do_fuse, world) -> None:
+        super().__init__(pose, twist, comms, sensor, tracker, fusion, do_fuse, world)
 
     def move(self, dt):
         # HACK for now
@@ -106,8 +115,8 @@ class Root(Agent):
 
     is_root = True
 
-    def __init__(self, pose, twist, comms, sensor, do_fuse, world) -> None:
-        super().__init__(pose, twist, comms, sensor, do_fuse, world)
+    def __init__(self, pose, twist, comms, sensor, tracker, fusion, do_fuse, world) -> None:
+        super().__init__(pose, twist, comms, sensor, tracker, fusion, do_fuse, world)
 
     def plan(self, dt):
         pass

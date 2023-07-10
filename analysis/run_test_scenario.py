@@ -14,10 +14,11 @@ from avstack.geometry import (
     AngularVelocity,
     transform_orientation,
 )
+from avstack.modules.tracking.tracker2d import BasicRazTracker
 from avstack.utils import IterationMonitor
 from PyQt5 import QtCore, QtWidgets
 
-from matk import Object, Radicle, Root, World, communications, display, motion, sensors
+from matk import Object, Radicle, Root, World, communications, display, motion, sensors, fusion
 
 
 def random_pose_twist(extent, reference, vmin=2, vmax=5, vsig=2, buffer=10):
@@ -39,7 +40,8 @@ def random_pose_twist(extent, reference, vmin=2, vmax=5, vsig=2, buffer=10):
 
 
 class MainThread(QtCore.QThread):
-    signal = QtCore.pyqtSignal(int, float, object, object)
+    truth_signal = QtCore.pyqtSignal(int, float, object, object)
+    estim_signal = QtCore.pyqtSignal(int, float, object, object)
 
     seed = 1
     np.random.seed(seed)
@@ -69,11 +71,15 @@ class MainThread(QtCore.QThread):
             pose, twist, ref = random_pose_twist(extent=extent, reference=GlobalOrigin3D)
             sensor_radicle = sensors.PositionSensor(ref, noise=[0, 0, 0],
                                                     extent=extent, fov=[30, np.pi/180*30, np.pi])
+            tracker_radicle = BasicRazTracker()
+            fusion_radicle = None
             rad = Radicle(
                 pose=pose,
                 twist=twist,
                 comms=communications.Omnidirectional(max_range=np.inf),
                 sensor=sensor_radicle,
+                tracker=tracker_radicle,
+                fusion=fusion_radicle,
                 do_fuse=False,
                 world=world,
             )
@@ -84,11 +90,15 @@ class MainThread(QtCore.QThread):
         pose, twist, ref = random_pose_twist(extent=extent, reference=GlobalOrigin3D)
         sensor_root = sensors.PositionSensor(ref, noise=[0, 0, 0],
                                              extent=extent, fov=[30, np.pi/180*30, np.pi])
+        tracker_root = BasicRazTracker()
+        fusion_root = fusion.AggregatorFusion()
         root = Root(
             pose=pose,
             twist=twist,
             comms=communications.Omnidirectional(max_range=np.inf),
             sensor=sensor_root,
+            tracker=tracker_root,
+            fusion=fusion_root,
             do_fuse=True,
             world=world,
         )
@@ -111,15 +121,16 @@ class MainThread(QtCore.QThread):
             random.shuffle(radicles)
             for rad in radicles:
                 detections = rad.observe()
-                rad.track(detections)
-                rad.send()
+                tracks = rad.track(detections)
+                rad.send(tracks)
 
             # Root agent will receive radicle observations
             detections = root.observe()
-            tracks = root.receive()
+            tracks_root = root.track(detections)
 
             # Then root will fuse detections and tracks
-            root.fuse(detections, tracks)
+            tracks_other = root.receive()
+            tracks_out = root.fuse(tracks_root, tracks_other)
 
             # Now, all agents perform planning and movements
             for rad in radicles:
@@ -129,8 +140,10 @@ class MainThread(QtCore.QThread):
             root.move(dt)
             monitor.tick()
 
-            # Update display
-            self.signal.emit(world.frame, world.t, world.objects, world.agents)
+            # Update displays
+            self.truth_signal.emit(world.frame, world.t, world.objects, world.agents)
+            track_objs = {track.ID:track for track in tracks_out}
+            self.estim_signal.emit(world.frame, world.t, track_objs, world.agents)
             time.sleep(sleeps)
 
 

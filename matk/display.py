@@ -22,7 +22,7 @@ from PyQt5 import QtCore, QtWidgets
 class MplCanvas(FigureCanvasQTAgg):
     def __init__(self, parent=None, width=10, height=8, dpi=100):
         fig = Figure(figsize=(width, height), dpi=dpi)
-        self.axes = fig.add_subplot(111)
+        self.axes = fig.subplots(1,2)
         super(MplCanvas, self).__init__(fig)
 
 
@@ -30,70 +30,71 @@ class MainWindow(QtWidgets.QMainWindow):
     def __init__(self, extent, thread, *args, **kwargs):
         super(MainWindow, self).__init__(*args, **kwargs)
         self._thread = thread
-        self._thread.signal.connect(self.update_data)
+        self._thread.truth_signal.connect(self.update_truth_data)
+        self._thread.estim_signal.connect(self.update_estim_data)
 
-        self.canvas = MplCanvas(self, width=10, height=8, dpi=100)
-        self.initialized = False
+        self.canvas = MplCanvas(self, width=14, height=8, dpi=100)
         self.setCentralWidget(self.canvas)
 
         # We need to store a reference to the plotted line
         # somewhere, so we can apply the new data to it.
         self.extent = extent
-        self.frame = 0
-        self.t = 0
-        self.objects = {}
-        self.agents = {}
-        self.pts = []
+        self.truth = {'supertitle':'Truth', 'initialized':False, 'frame':0, 't':0, 'objects':{}, 'agents':{}, 'pts':[]}
+        self.estim = {'supertitle':'Estimated', 'initialized':False, 'frame':0, 't':0, 'objects':{}, 'agents':{}, 'pts':[]}
 
         self._plot_ref = None
-        self.update_plot()
+        self.update_plots()
         self.show()
 
         # Setup a timer to trigger the redraw by calling update_plot.
         self.timer = QtCore.QTimer()
         self.timer.setInterval(100)
-        self.timer.timeout.connect(self.update_plot)
+        self.timer.timeout.connect(self.update_plots)
         self.timer.start()
         self._thread.start()
 
-    def update_data(self, frame, t, objects, agents):
-        self.frame = frame
-        self.t = t
-        self.objects = objects
-        self.agents = agents
+    @staticmethod
+    def _update_data(datastruct, frame, t, objects, agents):
+        datastruct['frame'] = frame
+        datastruct['t'] = t
+        datastruct['objects'] = objects
+        datastruct['agents'] = agents
+        return datastruct
 
-    def update_plot(self, obj_color="y", radicle_color="r", root_color="g"):
+    @staticmethod
+    def _update_plot(extent, axis, datastruct, obj_color, root_color, rad_color):
+
         # -- clear axes and set lims
-        for pt in self.pts:
+        for pt in datastruct['pts']:
             pt.remove()
-        self.pts = []
-        self.canvas.axes.set_title(f"Frame {self.frame:05d}...Time {self.t:6.2f} s")
+        datastruct['pts'] = []
+        axis.set_title(f"{datastruct['supertitle']}\nFrame {datastruct['frame']:05d}...Time {datastruct['t']:6.2f} s")
 
         # -- plot objects
-        for obj_ID, obj in self.objects.items():
-            self.pts.extend(
-                self.canvas.axes.plot(obj.position.x[0], obj.position.x[1], obj_color + "o")
+        for obj_ID, obj in datastruct['objects'].items():
+            datastruct['pts'].extend(
+                axis.plot(obj.position.x[0], obj.position.x[1], obj_color + "o")
             )
 
         # -- plot agents
-        for agent_ID, agent in self.agents.items():
+        for agent_ID, agent in datastruct['agents'].items():
             if agent.is_root:
-                self.pts.extend(
-                    self.canvas.axes.plot(
+                datastruct['pts'].extend(
+                    axis.plot(
                         agent.position.x[0], agent.position.x[1], root_color + "o"
                     )
                 )
             else:
-                self.pts.extend(
-                    self.canvas.axes.plot(
-                        agent.position.x[0], agent.position.x[1], radicle_color + "o"
+                datastruct['pts'].extend(
+                    axis.plot(
+                        agent.position.x[0], agent.position.x[1], rad_color + "o"
                     )
                 )
 
         # -- legend
-        if not self.initialized:
-            self.canvas.axes.set_xlim(*self.extent[0])
-            self.canvas.axes.set_ylim(*self.extent[1])
+        if not datastruct['initialized']:
+            axis.set_xlim(*extent[0])
+            axis.set_ylim(*extent[1])
             obj_point = Line2D(
                 [0],
                 [0],
@@ -110,8 +111,8 @@ class MainWindow(QtWidgets.QMainWindow):
                 label="Radicle",
                 marker="s",
                 markersize=10,
-                markeredgecolor=radicle_color,
-                markerfacecolor=radicle_color,
+                markeredgecolor=rad_color,
+                markerfacecolor=rad_color,
                 linestyle="",
             )
             root_point = Line2D(
@@ -124,12 +125,20 @@ class MainWindow(QtWidgets.QMainWindow):
                 markerfacecolor=root_color,
                 linestyle="",
             )
-            self.canvas.axes.legend(
+            axis.legend(
                 handles=[obj_point, rad_point, root_point], loc="upper right"
             )
-            self.canvas.axes.set_xlabel('X (index 0)')
-            self.canvas.axes.set_ylabel('Y (index 1)')
-            self.initialized = True
+            axis.set_xlabel('X (index 0)')
+            axis.set_ylabel('Y (index 1)')
+            datastruct['initialized'] = True
 
-        # Trigger the canvas to update and redraw.
+    def update_truth_data(self, frame, t, objects, agents):
+        self.truth = self._update_data(self.truth, frame, t, objects, agents)
+
+    def update_estim_data(self, frame, t, objects, agents):
+        self.estim = self._update_data(self.estim, frame, t, objects, agents)
+
+    def update_plots(self, obj_color="y", rad_color="r", root_color="g"):
+        self._update_plot(self.extent, self.canvas.axes[0], self.truth, obj_color, root_color, rad_color)
+        self._update_plot(self.extent, self.canvas.axes[1], self.estim, obj_color, root_color, rad_color)
         self.canvas.draw()
