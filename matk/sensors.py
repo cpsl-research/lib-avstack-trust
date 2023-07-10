@@ -2,14 +2,14 @@ import itertools
 import numpy as np
 from avstack.geometry.transformations import cartesian_to_spherical
 from avstack.datastructs import DataContainer
-from avstack.geometry import GlobalOrigin3D, Position
+from avstack.geometry import GlobalOrigin3D, Position, ReferenceFrame
 from avstack.modules.perception.detections import RazDetection
 
 
 class SensorModel():
     _ids = itertools.count()
 
-    def __init__(self, reference, noise, extent, fov, Pd=0.95, Dfa=1e-6) -> None:
+    def __init__(self, x, q, reference, noise, extent, fov, Pd=0.95, Dfa=1e-6) -> None:
         """Base class for an observation model
         
         noise  - component-wise noise model
@@ -19,13 +19,18 @@ class SensorModel():
         Dfa    - density of false alarms in 1/m^2
         """
         self.ID = next(SensorModel._ids)
-        self.reference = reference
+        self.x = x
+        self.q = q
         self.Pd = Pd
         self.Dfa = Dfa
         self.extent = extent
         self.fov = fov
         self.noise = noise
         self.area = (extent[0][1] - extent[0][0]) * (extent[1][1] - extent[1][0])
+        self._reference = ReferenceFrame(x=x, q=q, reference=reference)
+
+    def as_reference(self):
+        return self._reference
 
     def __call__(self, frame, timestamp, objects):
         # -- add false positives
@@ -42,7 +47,7 @@ class SensorModel():
                 # -- check in fov
                 if not isinstance(obj, Position):
                     obj = obj.position
-                obj = obj.change_reference(self.reference, inplace=False)
+                obj = obj.change_reference(self.as_reference(), inplace=False)
                 razel = cartesian_to_spherical(obj.x)
                 in_range = razel[0] <= self.fov[0]
                 in_azimuth = min(razel[1], 2*np.pi - razel[1]) <= self.fov[1]
@@ -59,19 +64,19 @@ class SensorModel():
     
 
 class PositionSensor(SensorModel):
-    def __init__(self, reference, noise, extent, fov, Pd=0.95, Dfa=1e-6) -> None:
-        super().__init__(reference, noise, extent, fov, Pd=Pd, Dfa=Dfa)
+    def __init__(self, x, q, reference, noise, extent, fov, Pd=0.95, Dfa=1e-6) -> None:
+        super().__init__(x, q, reference, noise, extent, fov, Pd=Pd, Dfa=Dfa)
 
     def observe(self, sensor, obj, noisy=True):
         """Make observation and add Gaussian noise"""
         if not isinstance(obj, Position):
             obj = obj.position
-        obj = obj.change_reference(self.reference, inplace=False)
+        obj = obj.change_reference(self.as_reference(), inplace=False)
         xyz = obj.x + self.noise * np.random.randn(3) if noisy else obj.x
         razel = cartesian_to_spherical(xyz)
         detection = RazDetection(
             source_identifier=sensor.ID,
             raz=razel[:2],
-            reference=self.reference,
+            reference=self.as_reference(),
         )
         return detection

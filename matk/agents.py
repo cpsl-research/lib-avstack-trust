@@ -42,22 +42,28 @@ class Agent:
         self.sensor = sensor
         self.tracker = tracker
         self.fusion = fusion
+        self._reference = ReferenceFrame(x=self.position.x, v=self.velocity.x,
+                                q=self.attitude.q, reference=self.position.reference)
 
     @property
     def position(self):
         return self.pose.position
 
     @property
-    def rotation(self):
-        return self.pose.rotation
+    def attitude(self):
+        return self.pose.attitude
     
     @property
     def velocity(self):
         return self.twist.linear
     
     def as_reference(self):
-        return ReferenceFrame(x=self.position.x, v=self.velocity.x,
-                              q=self.rotation.q, reference=self.position.reference)
+        return self._reference
+    
+    def update_reference(self, x, v, q):
+        self._reference.x = x
+        self._reference.v = v
+        self._reference.q = q
 
     def in_range(self, other):
         return self.comms.in_range(self, other)
@@ -105,6 +111,7 @@ class Radicle(Agent):
         # HACK for now
         self.motion = ConstantSpeedConstantTurn(extent=self.world.extent, radius=5)
         self.pose, self.twist = self.motion.tick(self.pose, self.twist, dt)
+        self.update_reference(self.pose.position.x, self.twist.linear.x, self.pose.attitude.q)
 
 
 class Root(Agent):

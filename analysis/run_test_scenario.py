@@ -46,7 +46,7 @@ class MainThread(QtCore.QThread):
     seed = 1
     np.random.seed(seed)
 
-    def run(self, dt=0.1, n_objects=10, n_radicles=5, print_method="real_time", print_rate=1/2):
+    def run(self, dt=0.1, n_objects=10, n_radicles=6, print_method="real_time", print_rate=1/2):
         # ===================================================
         # Scenario Parameters
         # ===================================================
@@ -69,39 +69,45 @@ class MainThread(QtCore.QThread):
         radicles = []
         for _ in range(n_radicles):
             pose, twist, ref = random_pose_twist(extent=extent, reference=GlobalOrigin3D)
-            sensor_radicle = sensors.PositionSensor(ref, noise=[0, 0, 0],
-                                                    extent=extent, fov=[30, np.pi/180*30, np.pi])
             tracker_radicle = BasicRazTracker()
             fusion_radicle = None
             rad = Radicle(
                 pose=pose,
                 twist=twist,
                 comms=communications.Omnidirectional(max_range=np.inf),
-                sensor=sensor_radicle,
+                sensor=None,
                 tracker=tracker_radicle,
                 fusion=fusion_radicle,
                 do_fuse=False,
                 world=world,
             )
+            x = np.array([0,0,0])
+            q = np.quaternion(1)
+            sensor_radicle = sensors.PositionSensor(x, q, rad.as_reference(), noise=[0, 0, 0],
+                                                    extent=extent, fov=[30, np.pi/180*30, np.pi])
+            rad.sensor = sensor_radicle
             radicles.append(rad)
             world.add_agent(rad)
 
         # -- spawn root agent
         pose, twist, ref = random_pose_twist(extent=extent, reference=GlobalOrigin3D)
-        sensor_root = sensors.PositionSensor(ref, noise=[0, 0, 0],
-                                             extent=extent, fov=[30, np.pi/180*30, np.pi])
         tracker_root = BasicRazTracker()
         fusion_root = fusion.AggregatorFusion()
         root = Root(
             pose=pose,
             twist=twist,
             comms=communications.Omnidirectional(max_range=np.inf),
-            sensor=sensor_root,
+            sensor=None,
             tracker=tracker_root,
             fusion=fusion_root,
             do_fuse=True,
             world=world,
         )
+        x = np.array([0,0,0])
+        q = np.quaternion(1)
+        sensor_root = sensors.PositionSensor(x, q, root.as_reference(), noise=[0, 0, 0],
+                                             extent=extent, fov=[30, np.pi/180*30, np.pi])
+        root.sensor = sensor_root
         world.add_agent(root)
 
         # -- run world loop

@@ -10,13 +10,18 @@ os.environ.pop("QT_QPA_PLATFORM_PLUGIN_PATH")
 #################################################################
 
 import matplotlib
+import numpy as np
 
 
 matplotlib.use("Qt5Agg")
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 from matplotlib.lines import Line2D
+from matplotlib.patches import Wedge
 from PyQt5 import QtCore, QtWidgets
+
+from avstack.geometry import GlobalOrigin3D
+from avstack.geometry.transformations import transform_orientation
 
 
 class MplCanvas(FigureCanvasQTAgg):
@@ -39,8 +44,10 @@ class MainWindow(QtWidgets.QMainWindow):
         # We need to store a reference to the plotted line
         # somewhere, so we can apply the new data to it.
         self.extent = extent
-        self.truth = {'supertitle':'Truth', 'initialized':False, 'frame':0, 't':0, 'objects':{}, 'agents':{}, 'pts':[]}
-        self.estim = {'supertitle':'Estimated', 'initialized':False, 'frame':0, 't':0, 'objects':{}, 'agents':{}, 'pts':[]}
+        self.truth = {'supertitle':'Truth', 'show_fov':True, 'initialized':False,
+                      'frame':0, 't':0, 'objects':{}, 'agents':{}, 'pts':[], 'wedges':[]}
+        self.estim = {'supertitle':'Estimated', 'show_fov':False, 'initialized':False,
+                      'frame':0, 't':0, 'objects':{}, 'agents':{}, 'pts':[], 'wedges':[]}
 
         self._plot_ref = None
         self.update_plots()
@@ -68,6 +75,9 @@ class MainWindow(QtWidgets.QMainWindow):
         for pt in datastruct['pts']:
             pt.remove()
         datastruct['pts'] = []
+        for wedge in datastruct['wedges']:
+            wedge.remove()
+        datastruct['wedges'] = []
         axis.set_title(f"{datastruct['supertitle']}\nFrame {datastruct['frame']:05d}...Time {datastruct['t']:6.2f} s")
 
         # -- plot objects
@@ -78,18 +88,23 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # -- plot agents
         for agent_ID, agent in datastruct['agents'].items():
-            if agent.is_root:
-                datastruct['pts'].extend(
-                    axis.plot(
-                        agent.position.x[0], agent.position.x[1], root_color + "o"
-                    )
+            color = root_color if agent.is_root else rad_color
+            datastruct['pts'].extend(
+                axis.plot(
+                    agent.position.x[0], agent.position.x[1], color + "o"
                 )
-            else:
-                datastruct['pts'].extend(
-                    axis.plot(
-                        agent.position.x[0], agent.position.x[1], rad_color + "o"
-                    )
-                )
+            )
+            # -- fov wedge
+            if datastruct['show_fov']:
+                s_global = agent.sensor.as_reference().integrate(start_at=GlobalOrigin3D)
+                center = [s_global.x[0], s_global.x[1]]
+                radius = agent.sensor.fov[0]
+                theta0 = transform_orientation(s_global.q, 'quat', 'euler')[2]
+                theta1 = (theta0 - agent.sensor.fov[1])*180/np.pi
+                theta2 = (theta0 + agent.sensor.fov[1])*180/np.pi
+                wedge = Wedge(center, radius, theta1, theta2, alpha=0.3, color=color)
+                axis.add_patch(wedge)
+                datastruct['wedges'].append(wedge)
 
         # -- legend
         if not datastruct['initialized']:
