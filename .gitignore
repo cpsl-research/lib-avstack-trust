@@ -1,6 +1,7 @@
 .install.stamp
 models
 models
+*.prof
 
 *.pth
 .coverage

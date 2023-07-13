@@ -1,6 +1,11 @@
+from __future__ import annotations
+import argparse
 import random
 import sys
 import time
+import logging
+import typing
+from PyQt5.QtCore import QObject
 
 import numpy as np
 from avstack.geometry import (
@@ -18,7 +23,7 @@ from avstack.modules.tracking.tracker2d import BasicRazTracker
 from avstack.utils import IterationMonitor
 from PyQt5 import QtCore, QtWidgets
 
-from matk import Object, Radicle, Root, World, communications, display, motion, sensors, fusion
+from matk import Object, Radicle, Root, World, communications, display, motion, sensors, fusion, clustering
 
 
 def random_pose_twist(extent, reference, vmin=2, vmax=5, vsig=2, buffer=10):
@@ -45,6 +50,9 @@ class MainThread(QtCore.QThread):
 
     seed = 1
     np.random.seed(seed)
+    def __init__(self, sleeps, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.sleeps = sleeps
 
     def run(self, dt=0.1, n_objects=10, n_radicles=6, print_method="real_time", print_rate=1/2):
         # ===================================================
@@ -92,7 +100,8 @@ class MainThread(QtCore.QThread):
         # -- spawn root agent
         pose, twist, ref = random_pose_twist(extent=extent, reference=GlobalOrigin3D)
         tracker_root = BasicRazTracker()
-        fusion_root = fusion.AggregatorFusion()
+        clustering_root = clustering.SampledAssignmentClustering(assign_radius=1)
+        fusion_root = fusion.CovarianceIntersectionFusion(clustering_root)
         root = Root(
             pose=pose,
             twist=twist,
@@ -119,44 +128,58 @@ class MainThread(QtCore.QThread):
         # ====================================================================
         monitor = IterationMonitor(sim_dt=dt, print_method=print_method, print_rate=print_rate)
         i_iter = 0
-        while True:
-            world.tick()
+        try:
+            while True:
+                world.tick()
 
-            # Radicles first update their own states and communicate
-            # Randomize the order to prevent ordering bias
-            random.shuffle(radicles)
-            for rad in radicles:
-                detections = rad.observe()
-                tracks = rad.track(detections)
-                rad.send(tracks)
+                # Radicles first update their own states and communicate
+                # Randomize the order to prevent ordering bias
+                random.shuffle(radicles)
+                for rad in radicles:
+                    detections = rad.observe()
+                    tracks = rad.track(detections)
+                    rad.send(tracks)
 
-            # Root agent will receive radicle observations
-            detections = root.observe()
-            tracks_root = root.track(detections)
+                # Root agent will receive radicle observations
+                detections = root.observe()
+                tracks_root = root.track(detections)
 
-            # Then root will fuse detections and tracks
-            tracks_other = root.receive()
-            tracks_out = root.fuse(tracks_root, tracks_other)
+                # Then root will fuse detections and tracks
+                tracks_other = root.receive()
+                tracks_out = root.fuse(tracks_root, tracks_other)
 
-            # Now, all agents perform planning and movements
-            for rad in radicles:
-                rad.plan(dt)
-                rad.move(dt)
-            root.plan(dt)
-            root.move(dt)
-            monitor.tick()
+                # Now, all agents perform planning and movements
+                for rad in radicles:
+                    rad.plan(dt)
+                    rad.move(dt)
+                root.plan(dt)
+                root.move(dt)
+                monitor.tick()
 
-            # Update displays
-            self.truth_signal.emit(world.frame, world.t, world.objects, world.agents)
-            track_objs = {track.ID:track for track in tracks_out}
-            self.estim_signal.emit(world.frame, world.t, track_objs, world.agents)
-            time.sleep(sleeps)
+                # Update displays
+                self.truth_signal.emit(world.frame, world.t, world.objects, world.agents)
+                track_objs = {track.ID:track for track in tracks_out}
+                self.estim_signal.emit(world.frame, world.t, track_objs, world.agents)
+                time.sleep(self.sleeps)
+        except (KeyboardInterrupt, Exception) as e:
+            logging.warning(e)
+        finally:
+            pass
 
 
 if __name__ == "__main__":
-    extent = [[0, 100], [0, 100], [0, 0]]  # x, y, z
-    sleeps = 0.02
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--sleeps', default=0.02, type=float)
+    parser.add_argument('--display', action="store_true")
+    args = parser.parse_args()
 
-    app = QtWidgets.QApplication(sys.argv)
-    window = display.MainWindow(extent=extent, thread=MainThread())
-    app.exec_()
+    extent = [[0, 100], [0, 100], [0, 0]]  # x, y, z
+
+    if args.display:
+        print('Running with display...')
+        app = QtWidgets.QApplication(sys.argv)
+        window = display.MainWindow(extent=extent, thread=MainThread(args.sleeps))
+        app.exec_()
+    else:
+        print('Running without display...')
+        MainThread(args.sleeps).run()

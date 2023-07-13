@@ -46,7 +46,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.extent = extent
         self.truth = {'supertitle':'Truth', 'show_fov':True, 'initialized':False,
                       'frame':0, 't':0, 'objects':{}, 'agents':{}, 'pts':[], 'wedges':[]}
-        self.estim = {'supertitle':'Estimated', 'show_fov':False, 'initialized':False,
+        self.estim = {'supertitle':'Estimated', 'show_fov':True, 'initialized':False,
                       'frame':0, 't':0, 'objects':{}, 'agents':{}, 'pts':[], 'wedges':[]}
 
         self._plot_ref = None
