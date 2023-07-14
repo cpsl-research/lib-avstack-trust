@@ -50,6 +50,7 @@ class SensorModel():
                 obj = obj.change_reference(self.as_reference(), inplace=False)
                 razel = cartesian_to_spherical(obj.x)
                 in_range = razel[0] <= self.fov[0]
+                razel[1] = razel[1] % (2*np.pi)
                 in_azimuth = min(razel[1], 2*np.pi - razel[1]) <= self.fov[1]
                 if not (in_range and in_azimuth):
                     continue
@@ -68,7 +69,7 @@ class PositionSensor(SensorModel):
         super().__init__(x, q, reference, noise, extent, fov, Pd=Pd, Dfa=Dfa)
 
     def observe(self, sensor, obj, noisy=True):
-        """Make observation and add Gaussian noise"""
+        """Make local observation and add Gaussian noise"""
         if not isinstance(obj, Position):
             obj = obj.position
         obj = obj.change_reference(self.as_reference(), inplace=False)

@@ -51,11 +51,13 @@ class MainThread(QtCore.QThread):
 
     seed = 1
     np.random.seed(seed)
-    def __init__(self, sleeps, *args, **kwargs) -> None:
+    def __init__(self, sleeps, n_radicles, n_objects, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.sleeps = sleeps
+        self.n_radicles = n_radicles
+        self.n_objects = n_objects
 
-    def run(self, dt=0.1, n_objects=10, n_radicles=6, print_method="real_time", print_rate=1/2):
+    def run(self, dt=0.1, print_method="real_time", print_rate=1/2):
         # ===================================================
         # Scenario Parameters
         # ===================================================
@@ -65,7 +67,7 @@ class MainThread(QtCore.QThread):
         world = World(dt=dt, extent=extent)
 
         # -- spawn objects randomly
-        for _ in range(n_objects):
+        for _ in range(self.n_objects):
             pose, twist, ref = random_pose_twist(extent=extent, reference=GlobalOrigin3D)
             obj = Object(
                 pose=pose,
@@ -76,9 +78,9 @@ class MainThread(QtCore.QThread):
 
         # -- spawn radicle agents
         radicles = []
-        for _ in range(n_radicles):
+        for _ in range(self.n_radicles):
             pose, twist, ref = random_pose_twist(extent=extent, reference=GlobalOrigin3D)
-            tracker_radicle = BasicRazTracker()
+            tracker_radicle = BasicRazTracker(threshold_confirmed=5, threshold_coast=20)
             fusion_radicle = None
             rad = Radicle(
                 pose=pose,
@@ -93,14 +95,14 @@ class MainThread(QtCore.QThread):
             x = np.array([0,0,0])
             q = np.quaternion(1)
             sensor_radicle = sensors.PositionSensor(x, q, rad.as_reference(), noise=[0, 0, 0],
-                                                    extent=extent, fov=[30, np.pi/180*30, np.pi])
+                                                    Pd=1.0, Dfa=0.0, extent=extent, fov=[30, np.pi/180*30, np.pi])
             rad.sensor = sensor_radicle
             radicles.append(rad)
             world.add_agent(rad)
 
         # -- spawn root agent
         pose, twist, ref = random_pose_twist(extent=extent, reference=GlobalOrigin3D)
-        tracker_root = BasicRazTracker()
+        tracker_root = BasicRazTracker(threshold_confirmed=5, threshold_coast=20)
         clustering_root = clustering.SampledAssignmentClustering(assign_radius=1)
         fusion_root = fusion.CovarianceIntersectionFusion(clustering_root)
         root = Root(
@@ -116,7 +118,7 @@ class MainThread(QtCore.QThread):
         x = np.array([0,0,0])
         q = np.quaternion(1)
         sensor_root = sensors.PositionSensor(x, q, root.as_reference(), noise=[0, 0, 0],
-                                             extent=extent, fov=[30, np.pi/180*30, np.pi])
+                                             Pd=1.0, Dfa=0.0, extent=extent, fov=[30, np.pi/180*30, np.pi])
         root.sensor = sensor_root
         world.add_agent(root)
 
@@ -173,6 +175,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--sleeps', default=0.02, type=float)
     parser.add_argument('--display', action="store_true")
+    parser.add_argument('--n_radicles', default=6, type=int)
+    parser.add_argument('--n_objects', default=10, type=int)
     args = parser.parse_args()
 
     extent = [[0, 100], [0, 100], [0, 0]]  # x, y, z
@@ -180,8 +184,8 @@ if __name__ == "__main__":
     if args.display:
         print('Running with display...')
         app = QtWidgets.QApplication(sys.argv)
-        window = display.MainWindow(extent=extent, thread=MainThread(args.sleeps))
+        window = display.MainWindow(extent=extent, thread=MainThread(args.sleeps, args.n_radicles, args.n_objects))
         app.exec_()
     else:
         print('Running without display...')
-        MainThread(args.sleeps).run()
+        MainThread(args.sleeps, args.n_radicles, args.n_objects).run()
