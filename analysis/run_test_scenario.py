@@ -46,6 +46,7 @@ def random_pose_twist(extent, reference, vmin=2, vmax=5, vsig=2, buffer=10):
 
 class MainThread(QtCore.QThread):
     truth_signal = QtCore.pyqtSignal(int, float, object, object)
+    detec_signal = QtCore.pyqtSignal(int, float, object, object)
     estim_signal = QtCore.pyqtSignal(int, float, object, object)
 
     seed = 1
@@ -137,6 +138,7 @@ class MainThread(QtCore.QThread):
                 random.shuffle(radicles)
                 for rad in radicles:
                     detections = rad.observe()
+                    self.detec_signal.emit(world.frame, world.t, rad, detections)
                     tracks = rad.track(detections)
                     rad.send(tracks)
 

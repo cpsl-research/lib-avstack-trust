@@ -20,6 +20,7 @@ from matplotlib.lines import Line2D
 from matplotlib.patches import Wedge
 from PyQt5 import QtCore, QtWidgets
 
+from avstack.datastructs import PriorityQueue
 from avstack.geometry import GlobalOrigin3D
 from avstack.geometry.transformations import transform_orientation
 
@@ -37,6 +38,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._thread = thread
         self._thread.truth_signal.connect(self.update_truth_data)
         self._thread.estim_signal.connect(self.update_estim_data)
+        self._thread.detec_signal.connect(self.update_detect_data)
 
         self.canvas = MplCanvas(self, width=14, height=8, dpi=100)
         self.setCentralWidget(self.canvas)
@@ -44,10 +46,13 @@ class MainWindow(QtWidgets.QMainWindow):
         # We need to store a reference to the plotted line
         # somewhere, so we can apply the new data to it.
         self.extent = extent
-        self.truth = {'supertitle':'Truth', 'show_fov':True, 'initialized':False,
+        self.truth = {'supertitle':'Truth', 'show_fov':True, 'show_detects':False, 'initialized':False,
                       'frame':0, 't':0, 'objects':{}, 'agents':{}, 'pts':[], 'wedges':[]}
-        self.estim = {'supertitle':'Estimated', 'show_fov':True, 'initialized':False,
+        self.estim = {'supertitle':'Estimated', 'show_fov':True, 'show_detects':True, 'initialized':False,
                       'frame':0, 't':0, 'objects':{}, 'agents':{}, 'pts':[], 'wedges':[]}
+        self.detect = {}
+        self.detect_frame_skip = 0
+        self.detect_frame_buffer = 20
 
         self._plot_ref = None
         self.update_plots()
@@ -60,16 +65,26 @@ class MainWindow(QtWidgets.QMainWindow):
         self.timer.start()
         self._thread.start()
 
+    def _update_detections(self, frame, t, obj, detections):
+        if obj.ID not in self.detect:
+            self.detect[obj.ID] = PriorityQueue(max_size=None,
+                    max_heap=False, empty_returns_none=True)
+        if (len(self.detect[obj.ID]) == 0) or (frame - self.detect[obj.ID].top()[0] > self.detect_frame_skip):
+            detects = []
+            for det in detections:
+                det = det.change_reference(GlobalOrigin3D, inplace=False)
+                detects.append((det.xy[0], det.xy[1]))
+            self.detect[obj.ID].push(frame, detects)
+
     @staticmethod
     def _update_data(datastruct, frame, t, objects, agents):
         datastruct['frame'] = frame
         datastruct['t'] = t
         datastruct['objects'] = objects
         datastruct['agents'] = agents
-        return datastruct
 
     @staticmethod
-    def _update_plot(extent, axis, datastruct, obj_color, root_color, rad_color):
+    def _update_plot(extent, axis, datastruct, x_data, obj_color, root_color, rad_color, x_frame_buffer):
 
         # -- clear axes and set lims
         for pt in datastruct['pts']:
@@ -105,6 +120,17 @@ class MainWindow(QtWidgets.QMainWindow):
                 wedge = Wedge(center, radius, theta1, theta2, alpha=0.3, color=color)
                 axis.add_patch(wedge)
                 datastruct['wedges'].append(wedge)
+
+            # -- detections
+            if datastruct['show_detects']:
+                if agent.ID in x_data:
+                    _ = x_data[agent.ID].pop_all_below(datastruct['frame']-x_frame_buffer)
+                    for frame, objs in x_data[agent.ID].heap:
+                        f_frac = min(1.0, 1 - (datastruct['frame'] - frame)/x_frame_buffer)
+                        for obj in objs:
+                            datastruct['pts'].extend(
+                                axis.plot(obj[0], obj[1], 'kx', alpha=f_frac)
+                                )
 
         # -- legend
         if not datastruct['initialized']:
@@ -148,12 +174,15 @@ class MainWindow(QtWidgets.QMainWindow):
             datastruct['initialized'] = True
 
     def update_truth_data(self, frame, t, objects, agents):
-        self.truth = self._update_data(self.truth, frame, t, objects, agents)
+        self._update_data(self.truth, frame, t, objects, agents)
 
     def update_estim_data(self, frame, t, objects, agents):
-        self.estim = self._update_data(self.estim, frame, t, objects, agents)
+        self._update_data(self.estim, frame, t, objects, agents)
+
+    def update_detect_data(self, frame, t, obj, detections):
+        self._update_detections(frame, t, obj, detections)
 
     def update_plots(self, obj_color="y", rad_color="r", root_color="g"):
-        self._update_plot(self.extent, self.canvas.axes[0], self.truth, obj_color, root_color, rad_color)
-        self._update_plot(self.extent, self.canvas.axes[1], self.estim, obj_color, root_color, rad_color)
+        self._update_plot(self.extent, self.canvas.axes[0], self.truth, {}, obj_color, root_color, rad_color, x_frame_buffer=0)
+        self._update_plot(self.extent, self.canvas.axes[1], self.estim, self.detect, obj_color, root_color, rad_color, x_frame_buffer=self.detect_frame_buffer)
         self.canvas.draw()
