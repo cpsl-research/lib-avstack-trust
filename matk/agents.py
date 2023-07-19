@@ -1,6 +1,8 @@
 import itertools
+
+from avstack.geometry import GlobalOrigin3D, ReferenceFrame
+
 from matk.motion import ConstantSpeedConstantTurn
-from avstack.geometry import ReferenceFrame, GlobalOrigin3D
 
 
 class Object:
@@ -31,7 +33,9 @@ class Object:
 class Agent:
     _ids = itertools.count()
 
-    def __init__(self, pose, twist, comms, sensor, tracker, fusion, do_fuse, world) -> None:
+    def __init__(
+        self, pose, twist, comms, sensor, tracker, fusion, do_fuse, world
+    ) -> None:
         self.ID = next(Agent._ids)
         self.comms = comms
         self.do_fuse = do_fuse
@@ -42,8 +46,12 @@ class Agent:
         self.sensor = sensor
         self.tracker = tracker
         self.fusion = fusion
-        self._reference = ReferenceFrame(x=self.position.x, v=self.velocity.x,
-                                q=self.attitude.q, reference=self.position.reference)
+        self._reference = ReferenceFrame(
+            x=self.position.x,
+            v=self.velocity.x,
+            q=self.attitude.q,
+            reference=self.position.reference,
+        )
 
     @property
     def position(self):
@@ -52,14 +60,14 @@ class Agent:
     @property
     def attitude(self):
         return self.pose.attitude
-    
+
     @property
     def velocity(self):
         return self.twist.linear
-    
+
     def as_reference(self):
         return self._reference
-    
+
     def update_reference(self, x, v, q):
         self._reference.x = x
         self._reference.v = v
@@ -75,8 +83,12 @@ class Agent:
 
     def track(self, detections):
         """Run normal tracking on detections"""
-        return self.tracker(frame=self.world.frame, t=self.world.t,
-                            detections=detections, platform=GlobalOrigin3D)
+        return self.tracker(
+            frame=self.world.frame,
+            t=self.world.t,
+            detections=detections,
+            platform=GlobalOrigin3D,
+        )
 
     def send(self, tracks):
         self.world.receive_tracks(self.t, self.ID, tracks)
@@ -95,23 +107,28 @@ class Agent:
 
     def move(self, dt):
         """Move based on a planned path"""
-    
+
 
 class Radicle(Agent):
     """Untrusted agent
 
     Mission is to keep monitoring some subregion
     """
+
     is_root = False
 
-    def __init__(self, pose, twist, comms, sensor, tracker, fusion, do_fuse, world) -> None:
+    def __init__(
+        self, pose, twist, comms, sensor, tracker, fusion, do_fuse, world
+    ) -> None:
         super().__init__(pose, twist, comms, sensor, tracker, fusion, do_fuse, world)
 
     def move(self, dt):
         # HACK for now
         self.motion = ConstantSpeedConstantTurn(extent=self.world.extent, radius=5)
         self.pose, self.twist = self.motion.tick(self.pose, self.twist, dt)
-        self.update_reference(self.pose.position.x, self.twist.linear.x, self.pose.attitude.q)
+        self.update_reference(
+            self.pose.position.x, self.twist.linear.x, self.pose.attitude.q
+        )
 
 
 class Root(Agent):
@@ -122,7 +139,9 @@ class Root(Agent):
 
     is_root = True
 
-    def __init__(self, pose, twist, comms, sensor, tracker, fusion, do_fuse, world) -> None:
+    def __init__(
+        self, pose, twist, comms, sensor, tracker, fusion, do_fuse, world
+    ) -> None:
         super().__init__(pose, twist, comms, sensor, tracker, fusion, do_fuse, world)
 
     def plan(self, dt):

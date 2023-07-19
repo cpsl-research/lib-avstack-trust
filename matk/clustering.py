@@ -1,14 +1,16 @@
 from typing import List
+
 import numpy as np
 from avstack.modules import assignment
 
 
-class SampledAssignmentClustering():
+class SampledAssignmentClustering:
     """Run assignment by sampling one object from a cluster
-    
+
     Assumes each sublist does not contain duplicates
     """
-    def __init__(self, assign_radius:float=8.0) -> None:
+
+    def __init__(self, assign_radius: float = 8.0) -> None:
         self.assign_radius = assign_radius
 
     def __call__(self, list_objects: List[list]) -> dict:
@@ -35,8 +37,7 @@ class SampledAssignmentClustering():
             for obj_idx in assign_sol.unassigned_rows:
                 object_clusters.append([objects[obj_idx]])
         return object_clusters
-    
 
-class HierarchicalAssignmentClustering():
+
+class HierarchicalAssignmentClustering:
     """Run assignment pairwise from binary tree for efficiency"""
-    pass

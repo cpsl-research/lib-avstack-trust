@@ -1,6 +1,3 @@
-from avstack.datastructs import PriorityQueue
-
-
 class World:
     def __init__(self, dt, extent) -> None:
         self.objects = {}

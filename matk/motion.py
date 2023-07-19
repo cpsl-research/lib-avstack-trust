@@ -42,8 +42,10 @@ class MotionModel:
             if adjust:
                 twist.linear.x[0] *= vel_mult[0]
                 twist.linear.x[1] *= vel_mult[1]
-                yaw = np.arctan2(twist.linear[1], twist.linear[0])  # negated bc this is passive transform (??)
-                pose.attitude.q = transform_orientation([0, 0, yaw], 'euler', 'quat')
+                yaw = np.arctan2(
+                    twist.linear[1], twist.linear[0]
+                )  # negated bc this is passive transform (??)
+                pose.attitude.q = transform_orientation([0, 0, yaw], "euler", "quat")
         return pose, twist
 
 

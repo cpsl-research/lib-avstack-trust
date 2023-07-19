@@ -169,6 +169,22 @@ tests = ["attrs[tests-no-zope]", "zope-interface"]
 tests-no-zope = ["cloudpickle", "hypothesis", "mypy (>=1.1.1)", "pympler", "pytest (>=4.3.0)", "pytest-mypy-plugins", "pytest-xdist[psutil]"]
 
 [[package]]
+name = "autoflake"
+version = "1.7.8"
+description = "Removes unused imports and unused variables"
+category = "dev"
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "autoflake-1.7.8-py3-none-any.whl", hash = "sha256:46373ef69b6714f5064c923bb28bd797c4f8a9497f557d87fc36665c6d956b39"},
+    {file = "autoflake-1.7.8.tar.gz", hash = "sha256:e7e46372dee46fa1c97acf310d99d922b63d369718a270809d7c278d34a194cf"},
+]
+
+[package.dependencies]
+pyflakes = ">=1.1.0,<3"
+tomli = {version = ">=2.0.1", markers = "python_version < \"3.11\""}
+
+[[package]]
 name = "backcall"
 version = "0.2.0"
 description = "Specifications for callback functions passed in to an API"
@@ -4864,4 +4880,4 @@ testing = ["big-O", "flake8 (<5)", "jaraco.functools", "jaraco.itertools", "more
 [metadata]
 lock-version = "2.0"
 python-versions = "~3.8"
-content-hash = "b43dc358385a79269b9fe462f0c7701b98be017474528effc3eb0b85463ca09a"
+content-hash = "c7bf84985eae97cdcc41f7ccb818a33b60d9e884efba57d5013c71b1e1f03153"

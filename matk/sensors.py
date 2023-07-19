@@ -1,17 +1,18 @@
 import itertools
+
 import numpy as np
-from avstack.geometry.transformations import cartesian_to_spherical
 from avstack.datastructs import DataContainer
 from avstack.geometry import GlobalOrigin3D, Position, ReferenceFrame
+from avstack.geometry.transformations import cartesian_to_spherical
 from avstack.modules.perception.detections import RazDetection
 
 
-class SensorModel():
+class SensorModel:
     _ids = itertools.count()
 
     def __init__(self, x, q, reference, noise, extent, fov, Pd=0.95, Dfa=1e-6) -> None:
         """Base class for an observation model
-        
+
         noise  - component-wise noise model
         extent - the area of the ENTIRE space (todo...update based on fov later maybe)
         fov    - the angular field of view of the sensor (max range, half azimuth, half elevation)
@@ -38,7 +39,7 @@ class SensorModel():
         x = np.random.uniform(low=self.extent[0][0], high=self.extent[0][1], size=n_fp)
         y = np.random.uniform(low=self.extent[0][0], high=self.extent[0][1], size=n_fp)
         z = np.zeros((n_fp,))
-        objs_fp = [Position(v, GlobalOrigin3D) for v in np.column_stack((x,y,z))]
+        objs_fp = [Position(v, GlobalOrigin3D) for v in np.column_stack((x, y, z))]
 
         # -- make measurements
         detections = []
@@ -50,8 +51,8 @@ class SensorModel():
                 obj = obj.change_reference(self.as_reference(), inplace=False)
                 razel = cartesian_to_spherical(obj.x)
                 in_range = razel[0] <= self.fov[0]
-                razel[1] = razel[1] % (2*np.pi)
-                in_azimuth = min(razel[1], 2*np.pi - razel[1]) <= self.fov[1]
+                razel[1] = razel[1] % (2 * np.pi)
+                in_azimuth = min(razel[1], 2 * np.pi - razel[1]) <= self.fov[1]
                 if not (in_range and in_azimuth):
                     continue
                 # -- make measurement
@@ -59,10 +60,10 @@ class SensorModel():
                     continue  # sometimes false negative
                 detections.append(self.observe(self, obj))
         return DataContainer(frame, timestamp, detections, self.ID)
-    
+
     def observe(self, sensor, obj, noisy):
         raise NotImplementedError
-    
+
 
 class PositionSensor(SensorModel):
     def __init__(self, x, q, reference, noise, extent, fov, Pd=0.95, Dfa=1e-6) -> None:

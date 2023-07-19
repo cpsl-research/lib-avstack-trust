@@ -36,8 +36,10 @@ lint: $(INSTALL_STAMP)
 
 .PHONY: format
 format: $(INSTALL_STAMP)
+		$(POETRY) run autoflake --remove-all-unused-imports -i -r ./tests/ $(NAME) ./analysis/ --exclude=__init__.py
 		$(POETRY) run isort --profile=black --lines-after-imports=2 ./tests/ $(NAME) ./analysis/
 		$(POETRY) run black ./tests/ $(NAME)
+
 
 .PHONY: test
 test: $(INSTALL_STAMP)
