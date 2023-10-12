@@ -82,7 +82,7 @@ def run_world_loop(thread, world, radicles, root, sleeps=0.01, dt=0.1, print_met
     # we will need to solve the track inception problem - meaning,
     # without having sent any tracks, who is the first to establish tracks?
     # ====================================================================
-    monitor = IterationMonitor(sim_dt=dt, print_method=print_method, print_rate=print_rate)
+    monitor = IterationMonitor(print_method=print_method, print_rate=print_rate)
     i_iter = 0
     try:
         while True:
