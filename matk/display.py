@@ -136,20 +136,20 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # -- plot agents
         for agent_ID, agent in datastruct["agents"].items():
-            color = root_color if agent.is_root else rad_color
+            color = root_color if agent.trusted else rad_color
             datastruct["pts"].extend(
                 axis.plot(agent.position.x[0], agent.position.x[1], color + "o")
             )
             # -- fov wedge
             if datastruct["show_fov"]:
-                s_global = agent.sensor.as_reference().integrate(
-                    start_at=GlobalOrigin3D
-                )
+                sens = agent.pipeline.sensing[list(agent.pipeline.sensing.keys())[0]]  # HACK for only 1 sensor
+                s_ref = sens.as_reference()
+                s_global = s_ref.integrate(start_at=GlobalOrigin3D)
                 center = [s_global.x[0], s_global.x[1]]
-                radius = agent.sensor.fov[0]
+                radius = sens.fov[0]
                 theta0 = transform_orientation(s_global.q, "quat", "euler")[2]
-                theta1 = (theta0 - agent.sensor.fov[1]) * 180 / np.pi
-                theta2 = (theta0 + agent.sensor.fov[1]) * 180 / np.pi
+                theta1 = (theta0 - sens.fov[1]) * 180 / np.pi
+                theta2 = (theta0 + sens.fov[1]) * 180 / np.pi
                 wedge = Wedge(center, radius, theta1, theta2, alpha=0.3, color=color)
                 axis.add_patch(wedge)
                 datastruct["wedges"].append(wedge)

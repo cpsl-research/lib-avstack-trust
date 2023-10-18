@@ -1,6 +1,5 @@
 import numpy as np
-
-from matk import clustering
+from avstack.modules.fusion import clustering
 
 
 class BasicObject:

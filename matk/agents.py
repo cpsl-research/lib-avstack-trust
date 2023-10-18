@@ -1,8 +1,6 @@
 import itertools
 
-from avstack.geometry import GlobalOrigin3D, ReferenceFrame
-
-from matk.motion import ConstantSpeedConstantTurn
+from avstack.geometry import ReferenceFrame
 
 
 class Object:
@@ -33,25 +31,21 @@ class Object:
 class Agent:
     _ids = itertools.count()
 
-    def __init__(
-        self, pose, twist, comms, sensor, tracker, fusion, do_fuse, world
-    ) -> None:
+    def __init__(self, pose, twist, trusted, world) -> None:
         self.ID = next(Agent._ids)
-        self.comms = comms
-        self.do_fuse = do_fuse
+        self.trusted = trusted
         self.world = world
         self.t = self.world.t
         self.pose = pose
         self.twist = twist
-        self.sensor = sensor
-        self.tracker = tracker
-        self.fusion = fusion
         self._reference = ReferenceFrame(
             x=self.position.x,
             v=self.velocity.x,
             q=self.attitude.q,
             reference=self.position.reference,
         )
+        self.comms = None
+        self.pipeline = None
 
     @property
     def position(self):
@@ -76,73 +70,99 @@ class Agent:
     def in_range(self, other):
         return self.comms.in_range(self, other)
 
-    def observe(self):
-        """Observe environment based on position and world"""
+    def tick(self):
         self.t = self.world.t
-        return self.sensor(self.world.frame, self.world.t, self.world.objects)
+        self.process()
 
-    def track(self, detections):
-        """Run normal tracking on detections"""
-        return self.tracker(
-            frame=self.world.frame,
-            t=self.world.t,
-            detections=detections,
-            platform=GlobalOrigin3D,
+    def process(self):
+        tracks_in = self.receive()
+        tracks_out = self.pipeline(
+            platform=self._reference, tracks_in=tracks_in, world=self.world
         )
+        self.send(tracks=tracks_out)
 
     def send(self, tracks):
-        self.world.receive_tracks(self.t, self.ID, tracks)
+        """Send tracks to out. Receive from world perspective"""
+        self.world.push_tracks(self.t, self.ID, tracks)
 
     def receive(self):
         """Send information out into the world, receive world information"""
-        tracks = self.world.send_tracks(self.t, self.ID)
+        tracks = self.world.pull_tracks(self.t, self.ID)
         return tracks
 
-    def fuse(self, tracks_self, tracks_other):
-        """Fuse information from other agents"""
-        return self.fusion(tracks_self=tracks_self, tracks_other=tracks_other)
-
-    def plan(self, dt):
+    def plan(self):
         """Plan a path based on the mission"""
 
-    def move(self, dt):
+    def move(self):
         """Move based on a planned path"""
 
 
-class Radicle(Agent):
-    """Untrusted agent
+class CommandCenter:
+    ID = -1  # special ID for the command center
 
-    Mission is to keep monitoring some subregion
-    """
+    def __init__(self, world) -> None:
+        self.world = world
+        self.t = self.world.t
 
-    is_root = False
+    def tick(self):
+        self.t = self.world.t
+        tracks_in = self.world.pull_tracks(self.t, self.ID, with_timestamp=False)
+        tracks_out = self.pipeline(tracks_in=tracks_in)
+        return tracks_out
 
-    def __init__(
-        self, pose, twist, comms, sensor, tracker, fusion, do_fuse, world
-    ) -> None:
-        super().__init__(pose, twist, comms, sensor, tracker, fusion, do_fuse, world)
+    # def fuse(self, tracks_self, tracks_other):
+    #     """Fuse information from other agents"""
+    #     return self.fusion(tracks_self=tracks_self, tracks_other=tracks_other)
 
-    def move(self, dt):
-        # HACK for now
-        self.motion = ConstantSpeedConstantTurn(extent=self.world.extent, radius=5)
-        self.pose, self.twist = self.motion.tick(self.pose, self.twist, dt)
-        self.update_reference(
-            self.pose.position.x, self.twist.linear.x, self.pose.attitude.q
-        )
+    # def observe(self):
+    #     """Observe environment based on position and world"""
+    #     self.t = self.world.t
+    #     return self.sensor(self.world.frame, self.world.t, self.world.objects)
+
+    # def track(self, detections):
+    #     """Run normal tracking on detections"""
+    #     return self.tracker(
+    #         frame=self.world.frame,
+    #         t=self.world.t,
+    #         detections=detections,
+    #         platform=GlobalOrigin3D,
+    #     )
 
 
-class Root(Agent):
-    """Trusted agent
+# class Radicle(Agent):
+#     """Untrusted agent
 
-    Mission is to monitor the radicle agents and keep awareness
-    """
+#     Mission is to keep monitoring some subregion
+#     """
 
-    is_root = True
+#     is_root = False
 
-    def __init__(
-        self, pose, twist, comms, sensor, tracker, fusion, do_fuse, world
-    ) -> None:
-        super().__init__(pose, twist, comms, sensor, tracker, fusion, do_fuse, world)
+#     def __init__(
+#         self, pose, twist, comms, sensor, tracker, fusion, do_fuse, world
+#     ) -> None:
+#         super().__init__(pose, twist, comms, sensor, tracker, fusion, do_fuse, world)
 
-    def plan(self, dt):
-        pass
+#     def move(self, dt):
+#         # HACK for now
+#         self.motion = ConstantSpeedConstantTurn(extent=self.world.extent, radius=5)
+#         self.pose, self.twist = self.motion.tick(self.pose, self.twist, dt)
+#         self.update_reference(
+#             self.pose.position.x, self.twist.linear.x, self.pose.attitude.q
+#         )
+
+
+# class Root(Agent):
+#     """Trusted agent
+
+#     Mission is to monitor the radicle agents and keep awareness
+#     """
+
+#     is_root = True
+
+#     def __init__(
+#         self, pose, twist, comms, sensor, tracker, fusion, do_fuse, world
+#     ) -> None:
+#         super().__init__(pose, twist, comms, sensor, tracker, fusion, do_fuse, world)
+
+#     def plan(self, dt):
+#         pass

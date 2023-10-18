@@ -49,6 +49,11 @@ class MotionModel:
         return pose, twist
 
 
+class Stationary(MotionModel):
+    def _tick(self, pose, twist, dt):
+        return pose, twist
+
+
 class ConstantSpeedMarkovTurn(MotionModel):
     def __init__(self, extent, sigma_roll=0, sigma_pitch=0, sigma_yaw=1) -> None:
         self.sigma_roll = sigma_roll
