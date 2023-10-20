@@ -1,4 +1,5 @@
 from typing import Any
+from avstack.geometry import GlobalOrigin3D
 
 
 class AgentPipeline:
@@ -48,4 +49,6 @@ class CommandCenterPipeline:
         self.fusion = fusion
 
     def __call__(self, tracks_in: dict, *args: Any, **kwds: Any) -> list:
+        for k, track in tracks_in.items():
+            track.apply("change_reference", reference=GlobalOrigin3D, inplace=True)  # eventually inplace=False
         return self.fusion(tracks_in)

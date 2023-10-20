@@ -93,6 +93,7 @@ class MainWindow(QtWidgets.QMainWindow):
             frame - self.detect[obj.ID].top()[0] > self.detect_frame_skip
         ):
             detects = []
+            print(len(detections))
             for det in detections:
                 det = det.change_reference(GlobalOrigin3D, inplace=False)
                 detects.append((det.xy[0], det.xy[1]))
@@ -130,6 +131,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # -- plot objects
         for obj_ID, obj in datastruct["objects"].items():
+            obj.change_reference(GlobalOrigin3D, inplace=True)
             datastruct["pts"].extend(
                 axis.plot(obj.position.x[0], obj.position.x[1], obj_color + "o")
             )

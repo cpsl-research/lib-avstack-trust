@@ -6,8 +6,11 @@ from avstack.geometry import ReferenceFrame
 class Object:
     _ids = itertools.count()
 
-    def __init__(self, pose, twist, motion) -> None:
-        self.ID = next(Object._ids)
+    def __init__(self, pose, twist, motion, ID_force=None) -> None:
+        if ID_force:
+            self.ID = ID_force
+        else:
+            self.ID = next(Object._ids)
         self.pose = pose
         self.twist = twist
         self.motion = motion
@@ -26,6 +29,15 @@ class Object:
 
     def tick(self, dt):
         self.pose, self.twist = self.motion.tick(self.pose, self.twist, dt)
+
+    def change_reference(self, reference, inplace):
+        if inplace:
+            self.pose.change_reference(reference, inplace=inplace)
+            self.twist.change_reference(reference, inplace=inplace)
+        else:
+            pose = self.pose.change_reference(reference, inplace=inplace)
+            twist = self.twist.change_reference(reference, inplace=inplace)
+            return Object(pose, twist, self.motion, ID_force=self.ID)
 
 
 class Agent:
@@ -109,6 +121,13 @@ class CommandCenter:
         tracks_in = self.world.pull_tracks(self.t, self.ID, with_timestamp=False)
         tracks_out = self.pipeline(tracks_in=tracks_in)
         return tracks_out
+
+
+
+
+
+
+
 
     # def fuse(self, tracks_self, tracks_other):
     #     """Fuse information from other agents"""
