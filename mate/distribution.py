@@ -6,7 +6,7 @@ class _Distribution:
     @property
     def var(self):
         return self.variance
-    
+
     @staticmethod
     def fit(x: list | np.ndarray):
         raise NotImplementedError
@@ -112,8 +112,8 @@ class Beta(_Distribution):
 
     def cdf(self, x: float):
         return stats.beta.cdf(x, self.a, self.b)
-    
-    def rvs(self, n: int, random_state: int|None = None):
+
+    def rvs(self, n: int, random_state: int | None = None):
         return stats.beta.rvs(self.a, self.b, size=n, random_state=random_state)
 
     def partial(self, param: str):
@@ -159,8 +159,8 @@ class OddsBeta(Beta):
 
     def cdf(self, x: float):
         return stats.betaprime.cdf(x, self.b, self.b)
-        
-    def rvs(self, n: int, random_state: int|None = None):
+
+    def rvs(self, n: int, random_state: int | None = None):
         return stats.betaprime.rvs(self.a, self.b, size=n, random_state=random_state)
 
     def partial(self, param: str):
