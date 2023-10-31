@@ -20,6 +20,9 @@ class _Distribution:
     def cdf(self, x: float):
         raise NotImplementedError
 
+    def rvs(self, n: int):
+        raise NotImplementedError
+
     def partial(self, param: str):
         raise NotImplementedError
 
@@ -92,8 +95,8 @@ class Beta(_Distribution):
 
     @staticmethod
     def fit(x: list | np.ndarray):
-        a, b, loc, scale = stats.beta.fit(x)
-        return a, b, loc, scale
+        a, b, _, _ = stats.beta.fit(x)
+        return Beta(alpha=a, beta=b)
 
     def set_via_moments(self, mean: float, variance: float):
         c0 = (mean * (1 - mean) / variance) - 1
@@ -109,6 +112,9 @@ class Beta(_Distribution):
 
     def cdf(self, x: float):
         return stats.beta.cdf(x, self.a, self.b)
+    
+    def rvs(self, n: int, random_state: int|None = None):
+        return stats.beta.rvs(self.a, self.b, size=n, random_state=random_state)
 
     def partial(self, param: str):
         if param == "alpha":
@@ -142,8 +148,8 @@ class OddsBeta(Beta):
 
     @staticmethod
     def fit(x: list | np.ndarray):
-        a, b, loc, scale = stats.betaprime.fit(x)
-        return a, b, loc, scale
+        a, b, _, _ = stats.betaprime.fit(x)
+        return OddsBeta(alpha=a, beta=b)
 
     def set_via_moments(self, mean: float, variance: float):
         raise NotImplementedError("Cannot set via moments for beta prime distribution.")
@@ -153,6 +159,9 @@ class OddsBeta(Beta):
 
     def cdf(self, x: float):
         return stats.betaprime.cdf(x, self.b, self.b)
+        
+    def rvs(self, n: int, random_state: int|None = None):
+        return stats.betaprime.rvs(self.a, self.b, size=n, random_state=random_state)
 
     def partial(self, param: str):
         if param == "alpha":
