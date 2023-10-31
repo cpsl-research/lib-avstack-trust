@@ -8,7 +8,11 @@ EPS = 1e-6
 
 
 class _TrustEstimator:
-    pass
+    def propagate(self, timestamp):
+        raise NotImplementedError
+
+    def update(self, timestamp, trust):
+        raise NotImplementedError
 
 
 class MaximumLikelihoodTrustEstimator(_TrustEstimator):
