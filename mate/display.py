@@ -28,6 +28,8 @@ class MplCanvas(FigureCanvasQTAgg):
     def __init__(self, parent=None, width=10, height=8, dpi=100):
         fig = Figure(figsize=(width, height), dpi=dpi)
         self.axes = fig.subplots(1, 2)
+        for ax in self.axes:
+            ax.set_aspect("equal")
         super(MplCanvas, self).__init__(fig)
 
 
@@ -144,7 +146,9 @@ class MainWindow(QtWidgets.QMainWindow):
             )
             # -- fov wedge
             if datastruct["show_fov"]:
-                sens = agent.pipeline.sensing[list(agent.pipeline.sensing.keys())[0]]  # HACK for only 1 sensor
+                sens = agent.pipeline.sensing[
+                    list(agent.pipeline.sensing.keys())[0]
+                ]  # HACK for only 1 sensor
                 s_ref = sens.as_reference()
                 s_global = s_ref.integrate(start_at=GlobalOrigin3D)
                 center = [s_global.x[0], s_global.x[1]]

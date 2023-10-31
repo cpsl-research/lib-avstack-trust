@@ -122,13 +122,6 @@ class CommandCenter:
         tracks_out = self.pipeline(tracks_in=tracks_in)
         return tracks_out
 
-
-
-
-
-
-
-
     # def fuse(self, tracks_self, tracks_other):
     #     """Fuse information from other agents"""
     #     return self.fusion(tracks_self=tracks_self, tracks_other=tracks_other)

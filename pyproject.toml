@@ -1,7 +1,7 @@
 [tool.poetry]
-name = "matk"
+name = "mate"
 version = "0.1.0-alpha.1"
-description = "Prototyping Kalman filters for multi-agent trust modeling"
+description = "Prototyping estimators for multi-agent trust modeling"
 authors = ["Spencer Hallyburton <spencer.hallyburton@duke.edu>"]
 readme = "README.md"
 license = "MIT"

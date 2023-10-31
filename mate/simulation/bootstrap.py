@@ -4,9 +4,10 @@ from avstack.modules.fusion import clustering, track_to_track
 from avstack.modules.perception import object3d
 from avstack.modules.tracking import tracker2d
 
-from . import communications, dynamics, sensors, wrappers
+from .. import trust, wrappers
+from ..pipeline import AgentPipeline, CommandCenterPipeline
+from . import communications, dynamics, sensors
 from .agents import Agent, CommandCenter, Object
-from .pipeline import AgentPipeline, CommandCenterPipeline
 from .utils import random_pose_twist
 from .world import World
 
@@ -204,6 +205,8 @@ def init_fusion(cfg_fusion, world):
         else:
             raise NotImplementedError(cfg_fusion.clustering.type)
         fuser = track_to_track.CovarianceIntersectionFusion(clustering=clust)
+    elif cfg_fusion.type == "PointBasedTrustCIFusion":
+        fuser = trust.PointBasedTrustCIFusion()
     else:
         raise NotImplementedError(cfg_fusion.type)
 

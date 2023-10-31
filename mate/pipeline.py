@@ -1,4 +1,5 @@
 from typing import Any
+
 from avstack.geometry import GlobalOrigin3D
 
 
@@ -30,7 +31,9 @@ class AgentPipeline:
             k: v(
                 frame=world.frame,
                 t=world.t,
-                detections=[p_out[kp] for kp in v.percep_ID_input][0],  # HACK for only 1 percep input...
+                detections=[p_out[kp] for kp in v.percep_ID_input][
+                    0
+                ],  # HACK for only 1 percep input...
                 platform=platform,
             )
             for k, v in self.tracking.items()
@@ -50,5 +53,7 @@ class CommandCenterPipeline:
 
     def __call__(self, tracks_in: dict, *args: Any, **kwds: Any) -> list:
         for k, track in tracks_in.items():
-            track.apply("change_reference", reference=GlobalOrigin3D, inplace=True)  # eventually inplace=False
+            track.apply(
+                "change_reference", reference=GlobalOrigin3D, inplace=True
+            )  # eventually inplace=False
         return self.fusion(tracks_in)

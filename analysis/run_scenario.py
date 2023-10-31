@@ -10,7 +10,7 @@ from avstack.config import Config
 from avstack.utils.decorators import FunctionTriggerIterationMonitor
 from PyQt5 import QtCore, QtWidgets
 
-from matk import display, load_scenario_from_config
+from mate import display, load_scenario_from_config
 
 
 def do_run(MainThread):

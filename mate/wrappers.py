@@ -8,7 +8,7 @@ class _Wrapper:
 
     def __call__(self, *args: Any, **kwds: Any) -> Any:
         return self.model(*args, **kwds)
-    
+
     def __getattr__(self, name: str) -> Any:
         return getattr(self.model, name)
 
