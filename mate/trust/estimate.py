@@ -1,3 +1,5 @@
+from typing import Union
+
 import numpy as np
 from avstack.datastructs import PriorityQueue
 
@@ -20,7 +22,7 @@ class MaximumLikelihoodTrustEstimator(_TrustEstimator):
         self,
         dist: _Distribution,
         update_rate: float = 10,
-        time_window: int | None = None,
+        time_window: Union[int, None] = None,
         forgetting: float = 0.0,
         max_variance: float = None,
         n_min_update: int = 5,

@@ -1,3 +1,5 @@
+import mate.simulation
+
 from .simulation.agents import Agent, CommandCenter, Object
 from .simulation.bootstrap import (
     load_scenario_from_config,

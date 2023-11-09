@@ -1,6 +1,9 @@
+import math
 from typing import Any
 
-from mate import connectives
+import numpy as np
+
+from mate import connectives, distribution
 
 
 def agent_score():
@@ -20,7 +23,7 @@ class ClusterScorer:
     def negation(self, a):
         return self.connective.negation(a)
 
-    def __call__(self, cluster, agents, observations, *args: Any, **kwds: Any) -> Any:
+    def __call__(self, cluster, agents, *args: Any, **kwds: Any) -> Any:
         """Obtain a trust score for the cluster of interest
 
         trust represents the probability that the object is real and that the state is trusted
@@ -122,25 +125,67 @@ class ClusterScorer:
         return score
 
 
-def i_agents_is_many():
-    raise
+def i_agents_is_many(i, k=3, lam=5):
+    """Is the number of i agents large?
+
+    Modeled with a Weibull CDF
+    """
+    return distribution.Weibull(k=k, lam=lam).cdf(i)
 
 
-def i_agents_is_large_fraction():
-    raise
+def i_agents_is_large_fraction(i, n, alpha=4, beta=2):
+    """is the number i a large fraction of n agents?
+
+    Modeled as a beta distribution CDF
+    """
+    return distribution.Beta(alpha=alpha, beta=beta).cdf(i / n)
 
 
-def agent_high_track_score():
-    raise
+def agent_high_track_score(agent, cluster):
+    """if agent has a track in the cluster, return score"""
+    if agent.ID in cluster.agent_IDs:
+        tracks = cluster.get_tracks_by_agent_ID(agent.ID)
+        if len(tracks) != 1:
+            raise RuntimeError(
+                "Can only handle when a cluster has 1 track from an agent for now"
+            )
+        return high_track_score(tracks[0].score)
+    else:
+        return 0.0
 
 
-def agent_expected_to_see():
-    raise
+def high_track_score(s):
+    """Probability computed directly from track score"""
+    return math.exp(s) / (1 + math.exp(s))
 
 
-def agent_is_trusted():
-    raise
+def agent_expected_to_see(agent, cluster):
+    """Observation model of expecting to be able to view object"""
+    return float(agent.ID in cluster.agent_IDs)  # TODO: implement this...
 
 
-def agent_has_similar_track_state():
-    raise
+def agent_is_trusted(agent):
+    """Probability computed directly from agent"""
+    return agent.trust
+
+
+def agent_has_similar_track_state(agent, cluster):
+    """Computing similarity of track states"""
+    if agent.ID in cluster.agent_IDs:
+        # get track parameters
+        tracks = cluster.get_tracks_by_agent_ID(agent.ID)
+        if len(tracks) != 1:
+            raise RuntimeError(
+                "Can only handle when a cluster has 1 track from an agent for now"
+            )
+        a_track = tracks[0]
+        x_a, P_a = a_track.x, a_track.P
+        x_c, P_c = cluster.state.x, cluster.state.P
+
+        # compute track similarities
+        y = x_a - x_c
+        S = P_a + P_c
+        g = y.T @ np.linalg.solve(S, y)
+        return 1 - distribution.Chi2(df=len(y)).cdf(g)
+    else:
+        return 0.0

@@ -15,8 +15,8 @@ classifiers = [
 [tool.poetry.dependencies]
 python = "~3.10"
 PyQt5 = "=5.15.2"
-lib-avstack-api = { path = "submodules/lib-avstack-api", develop = true }
-lib-avstack-core = { path = "submodules/lib-avstack-core", develop = true }
+lib-avstack-api = { path = "third_party/lib-avstack-api", develop = true }
+lib-avstack-core = { path = "third_party/lib-avstack-core", develop = true }
 
 [tool.poetry.group.test.dependencies]
 pytest = "^7"

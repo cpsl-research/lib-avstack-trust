@@ -3,8 +3,8 @@ from avstack.geometry import GlobalOrigin3D
 
 class World:
     def __init__(self, dt, extent) -> None:
-        self.objects = {}
-        self.agents = {}
+        self._object_map = {}
+        self._agent_map = {}
         self.tracks = {}
         self.frame = 0
         self.t = 0
@@ -12,29 +12,37 @@ class World:
         self.extent = extent
         self.origin = GlobalOrigin3D
 
+    @property
+    def objects(self):
+        return list(self._object_map.values())
+
+    @property
+    def agents(self):
+        return list(self._agent_map.values())
+
     def tick(self):
         self.frame += 1
         self.t += self.dt
-        for obj in self.objects.values():
+        for obj in self.objects:
             obj.tick(self.dt)
 
     def add_object(self, obj):
-        if obj.ID not in self.objects:
-            self.objects[obj.ID] = obj
+        if obj.ID not in self._object_map:
+            self._object_map[obj.ID] = obj
 
     def add_agent(self, agent):
-        if agent.ID not in self.agents:
-            self.agents[agent.ID] = agent
+        if agent.ID not in self._agent_map:
+            self._agent_map[agent.ID] = agent
             self.tracks[agent.ID] = (None, [])
 
     def get_neighbors(self, agent_ID):
         """Get all agent neighbors of some agent"""
         neighbors = []
-        for ID, other in self.agents.items():
+        for ID, other in self._agent_map.items():
             if agent_ID == -1:
                 neighbors.append(ID)
-            elif ID != self.agents[agent_ID]:
-                if self.agents[agent_ID].in_range(other):
+            elif ID != self._agent_map[agent_ID]:
+                if self._agent_map[agent_ID].in_range(other):
                     neighbors.append(ID)
         return neighbors
 

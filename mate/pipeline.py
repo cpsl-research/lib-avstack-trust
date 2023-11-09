@@ -48,12 +48,19 @@ class AgentPipeline:
 class CommandCenterPipeline:
     """Fusion pipeline for the command center"""
 
-    def __init__(self, fusion) -> None:
+    def __init__(self, clustering, fusion, trust) -> None:
+        self.clustering = clustering
         self.fusion = fusion
+        self.trust = trust
 
-    def __call__(self, tracks_in: dict, *args: Any, **kwds: Any) -> list:
-        for k, track in tracks_in.items():
+    def __call__(self, agents: list, tracks_in: dict, *args: Any, **kwds: Any) -> list:
+        cluster_inputs = []
+        for agent_ID, track in tracks_in.items():
             track.apply(
                 "change_reference", reference=GlobalOrigin3D, inplace=True
             )  # eventually inplace=False
-        return self.fusion(tracks_in)
+            cluster_inputs.append((agent_ID, track))
+        clusters = self.clustering(*cluster_inputs)
+        fuseds = self.fusion(clusters)
+        trusts = self.trust(clusters, fuseds, agents)
+        return fuseds, trusts

@@ -46,6 +46,7 @@ class Agent:
     def __init__(self, pose, twist, trusted, world) -> None:
         self.ID = next(Agent._ids)
         self.trusted = trusted
+        self._trust = 1.0 if trusted else 0.5
         self.world = world
         self.t = self.world.t
         self.pose = pose
@@ -70,6 +71,10 @@ class Agent:
     @property
     def velocity(self):
         return self.twist.linear
+
+    @property
+    def trust(self):
+        return self._trust
 
     def as_reference(self):
         return self._reference
@@ -118,63 +123,7 @@ class CommandCenter:
 
     def tick(self):
         self.t = self.world.t
+        agents = self.world.agents
         tracks_in = self.world.pull_tracks(self.t, self.ID, with_timestamp=False)
-        tracks_out = self.pipeline(tracks_in=tracks_in)
+        tracks_out = self.pipeline(agents=agents, tracks_in=tracks_in)
         return tracks_out
-
-    # def fuse(self, tracks_self, tracks_other):
-    #     """Fuse information from other agents"""
-    #     return self.fusion(tracks_self=tracks_self, tracks_other=tracks_other)
-
-    # def observe(self):
-    #     """Observe environment based on position and world"""
-    #     self.t = self.world.t
-    #     return self.sensor(self.world.frame, self.world.t, self.world.objects)
-
-    # def track(self, detections):
-    #     """Run normal tracking on detections"""
-    #     return self.tracker(
-    #         frame=self.world.frame,
-    #         t=self.world.t,
-    #         detections=detections,
-    #         platform=GlobalOrigin3D,
-    #     )
-
-
-# class Radicle(Agent):
-#     """Untrusted agent
-
-#     Mission is to keep monitoring some subregion
-#     """
-
-#     is_root = False
-
-#     def __init__(
-#         self, pose, twist, comms, sensor, tracker, fusion, do_fuse, world
-#     ) -> None:
-#         super().__init__(pose, twist, comms, sensor, tracker, fusion, do_fuse, world)
-
-#     def move(self, dt):
-#         # HACK for now
-#         self.motion = ConstantSpeedConstantTurn(extent=self.world.extent, radius=5)
-#         self.pose, self.twist = self.motion.tick(self.pose, self.twist, dt)
-#         self.update_reference(
-#             self.pose.position.x, self.twist.linear.x, self.pose.attitude.q
-#         )
-
-
-# class Root(Agent):
-#     """Trusted agent
-
-#     Mission is to monitor the radicle agents and keep awareness
-#     """
-
-#     is_root = True
-
-#     def __init__(
-#         self, pose, twist, comms, sensor, tracker, fusion, do_fuse, world
-#     ) -> None:
-#         super().__init__(pose, twist, comms, sensor, tracker, fusion, do_fuse, world)
-
-#     def plan(self, dt):
-#         pass

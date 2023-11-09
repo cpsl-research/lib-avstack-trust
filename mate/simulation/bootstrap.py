@@ -1,15 +1,16 @@
 import numpy as np
 from avstack.config import Config
-from avstack.modules.fusion import clustering, track_to_track
+from avstack.modules.clustering import clusterers
+from avstack.modules.fusion import track_to_track
 from avstack.modules.perception import object3d
 from avstack.modules.tracking import tracker2d
 
-from .. import trust, wrappers
-from ..pipeline import AgentPipeline, CommandCenterPipeline
-from . import communications, dynamics, sensors
-from .agents import Agent, CommandCenter, Object
-from .utils import random_pose_twist
-from .world import World
+from mate import distribution, trust, wrappers
+from mate.pipeline import AgentPipeline, CommandCenterPipeline
+from mate.simulation import communications, dynamics, sensors
+from mate.simulation.agents import Agent, CommandCenter, Object
+from mate.simulation.utils import random_pose_twist
+from mate.simulation.world import World
 
 
 def load_scenario_from_config_file(filename: str):
@@ -116,8 +117,10 @@ def init_agent_models(cfg, agent, world):
 
 
 def init_commandcenter_models(cfg, commandcenter, world):
+    clustering = init_clustering(cfg.clustering, world)
     fusion = init_fusion(cfg.fusion, world)
-    pipe = CommandCenterPipeline(fusion)
+    trust = init_trust(cfg.trust, world)
+    pipe = CommandCenterPipeline(clustering, fusion, trust)
 
     return pipe
 
@@ -192,22 +195,45 @@ def init_tracking(cfg_tracking, world):
     return tracker
 
 
+def init_clustering(cfg_cluster, world):
+    if cfg_cluster.clustering.type == "SampledAssignmentClustering":
+        clust = clusterers.SampledAssignmentClustering(
+            assign_radius=cfg_cluster.clustering.assign_radius
+        )
+    else:
+        raise NotImplementedError(cfg_cluster.clustering.type)
+    return clust
+
+
 def init_fusion(cfg_fusion, world):
     if cfg_fusion.type == "AggregatorFusion":
         fuser = track_to_track.AggregatorFusion()
     elif cfg_fusion.type == "NoFusion":
         fuser = track_to_track.NoFusion()
     elif cfg_fusion.type == "CovarianceIntersectionFusion":
-        if cfg_fusion.clustering.type == "SampledAssignmentClustering":
-            clust = clustering.SampledAssignmentClustering(
-                assign_radius=cfg_fusion.clustering.assign_radius
-            )
-        else:
-            raise NotImplementedError(cfg_fusion.clustering.type)
-        fuser = track_to_track.CovarianceIntersectionFusion(clustering=clust)
-    elif cfg_fusion.type == "PointBasedTrustCIFusion":
-        fuser = trust.PointBasedTrustCIFusion()
+        fuser = track_to_track.CovarianceIntersectionFusion()
     else:
         raise NotImplementedError(cfg_fusion.type)
-
     return fuser
+
+
+def init_trust(cfg_trust, world):
+    if cfg_trust.type == "PointBasedTrust":
+        cluster_scorer = trust.measurement.ClusterScorer(
+            connective=trust.connectives.StandardFuzzy
+        )
+        agent_scorer = lambda x, y, z: 0.5
+        trust_estimator = trust.estimate.MaximumLikelihoodTrustEstimator(
+            dist=distribution.Beta(
+                alpha=cfg_trust.estimator.alpha,
+                beta=cfg_trust.estimator.beta,
+                phi=cfg_trust.estimator.phi,
+                lam=cfg_trust.estimator.lam,
+            )
+        )
+        trust_model = trust.PointBasedTrust(
+            cluster_scorer, agent_scorer, trust_estimator
+        )
+    else:
+        raise NotImplementedError(cfg_trust.type)
+    return trust_model

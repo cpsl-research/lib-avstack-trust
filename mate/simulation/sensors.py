@@ -43,7 +43,7 @@ class SensorModel:
 
         # -- make measurements
         detections = []
-        for i, objs in enumerate((list(objects.values()), objs_fp)):
+        for i, objs in enumerate((objects, objs_fp)):
             for obj in objs:
                 # -- check in fov
                 if not isinstance(obj, Position):

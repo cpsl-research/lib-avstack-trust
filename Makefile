@@ -21,6 +21,10 @@ $(INSTALL_STAMP): pyproject.toml poetry.lock
 		$(POETRY) install
 		touch $(INSTALL_STAMP)
 
+.PHONY: simulation
+simulation: $(INSTALL_STAMP)
+	$(POETRY) run python analysis/run_scenario.py config/scenarios/test_scenario.py --display
+
 .PHONY: clean
 clean:
 		find . -type d -name "__pycache__" | xargs rm -rf {};

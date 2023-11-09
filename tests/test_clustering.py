@@ -1,5 +1,5 @@
 import numpy as np
-from avstack.modules.fusion import clustering
+from avstack.modules.clustering import clusterers
 
 
 class BasicObject:
@@ -79,7 +79,7 @@ def test_sampled_clustering():
     observations = [[objects[i] for i in obj_list] for obj_list in objects_idx_list]
 
     # Run clustering algorithm
-    clusterer = clustering.SampledAssignmentClustering(assign_radius=1)
+    clusterer = clusterers.SampledAssignmentClustering(assign_radius=1)
     clusters = clusterer(observations)
     assert len(clusters) == n_objects
     assert len([c for c in clusters if len(c) > 1]) == n_clusters
