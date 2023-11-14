@@ -56,7 +56,9 @@ class MaximumLikelihoodTrustEstimator(_TrustEstimator):
             if self.t_last_prop is None:
                 self.t_last_prop = timestamp
             dt = timestamp - self.t_last_prop
-            if dt != 0:
+            if dt < 0:
+                raise RuntimeError("dt must be greater than or equal 0")
+            elif dt > 0:
                 self.variance_scaling = 1.0 + self.forgetting * dt
                 if self.max_variance:
                     var = min(self.max_variance, self.dist.var * self.variance_scaling)

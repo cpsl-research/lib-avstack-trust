@@ -24,25 +24,47 @@ class PointBasedTrustPipeline(_TrustPipeline):
         # algorithms
         self.cluster_scorer = ALGORITHMS.build(cluster_scorer)
         self.agent_scorer = ALGORITHMS.build(agent_scorer)
-        self.trust_estimator = ALGORITHMS.build(trust_estimator)
+        self.cluster_trust_estimator = trust_estimator
+        self.agent_trust_estimator = trust_estimator
 
         # data structures
         self.cluster_trusts = {}
         self.agent_trusts = {}
 
     def __call__(
-        self, group_tracks: List[GroupTrack], agents: list, *args: Any, **kwds: Any
+        self,
+        group_tracks: List[GroupTrack],
+        agents: list,
+        timestamp: float,
+        *args: Any,
+        **kwds: Any
     ) -> Any:
 
-
         # cluster-based trust measurements
-        t_msmts_cluster = [self.cluster_scorer(group_track, agents) for group_track in group_tracks]
+        for group_track in group_tracks:
+            trust_msmt_cluster = self.cluster_scorer(group_track, agents)
+            if group_track.ID not in self.cluster_trusts:
+                self.cluster_trusts[group_track.ID] = ALGORITHMS.build(
+                    self.cluster_trust_estimator
+                )
+            self.cluster_trusts[group_track.ID].update(
+                timestamp=group_track.t,
+                trust=trust_msmt_cluster,
+            )
+
+        # propagate all cluster-based trusts to the present time
+        for cluster_trust in self.cluster_trusts.values():
+            cluster_trust.propagate(timestamp)
 
         # cluster-based agent measurements
-        t_msmts_agent = [self.agent_scorer(agent, agents, group_tracks) for agent in agents]
+        for agent in agents:
+            trust_msmt_agent = self.agent_scorer(agent, agents, group_tracks)
+            if agent.ID not in self.agent_trusts:
+                self.agent_trusts[agent.ID] = ALGORITHMS.build(
+                    self.agent_trust_estimator
+                )
+            self.agent_trusts[agent.ID].update(
+                timestamp=timestamp, trust=trust_msmt_agent
+            )
 
-        # trust estimations
-        cluster_trusts = [None] * len(group_tracks)
-        agent_trusts = [None] * len(agents)
-
-        return cluster_trusts, agent_trusts
+        return self.cluster_trusts, self.agent_trusts

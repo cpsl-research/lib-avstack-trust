@@ -70,5 +70,7 @@ class CommandCenterPipeline:
             clusters=clusters, platform=platform, frame=frame, timestamp=timestamp
         )
         group_tracks = [track for track in group_tracks if len(track.members) > 0]
-        trusts = self.trust(group_tracks=group_tracks, agents=agents)
+        trusts = self.trust(
+            group_tracks=group_tracks, agents=agents, timestamp=timestamp
+        )
         return group_tracks, trusts
