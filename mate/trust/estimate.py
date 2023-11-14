@@ -51,7 +51,12 @@ class MaximumLikelihoodTrustEstimator(_TrustEstimator):
         self.buffer = PriorityQueue(max_size=None, max_heap=False)
 
     def propagate(self, timestamp):
-        """Propagation model for the trust distribution"""
+        """Propagation model for the trust distribution
+        
+        TODO: propagation should interpolate back to uniform distribution
+        TODO: figure out the phi, var of the uniform and interpolate (?)
+        TODO: max variance should be that which comes of the uniform (?)
+        """
         if self.forgetting != 0:
             if self.t_last_prop is None:
                 self.t_last_prop = timestamp
