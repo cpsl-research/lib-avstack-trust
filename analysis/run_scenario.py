@@ -64,12 +64,13 @@ def _run_inner(thread, world, objects, agents, commandcenter, sleeps=0.01):
         agent.move()
 
     # -- run the central processing
-    tracks_out, trusts = commandcenter.tick()
+    tracks_out, cluster_trusts, agent_trusts = commandcenter.tick()
 
     # -- update displays
     if thread is not None:
         thread.truth_signal.emit(world.frame, world.t, world.objects, world.agents)
         thread.estim_signal.emit(world.frame, world.t, tracks_out, world.agents)
+        thread.trust_signal.emit(world.frame, world.t, cluster_trusts, agent_trusts)
     time.sleep(sleeps)
 
 
@@ -77,6 +78,7 @@ class MainThread(QtCore.QThread):
     truth_signal = QtCore.pyqtSignal(int, float, object, object)
     detec_signal = QtCore.pyqtSignal(int, float, object, object)
     estim_signal = QtCore.pyqtSignal(int, float, object, object)
+    trust_signal = QtCore.pyqtSignal(int, float, object, object)
 
     def __init__(self, cfg, sleeps=0.01, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)

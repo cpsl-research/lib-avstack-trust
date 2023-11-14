@@ -40,6 +40,18 @@ class PointBasedTrustPipeline(_TrustPipeline):
         **kwds: Any
     ) -> Any:
 
+        # clear any out of date ones
+        IDs_remove = []
+        for ID in self.cluster_trusts.keys():
+            for track in group_tracks:
+                if ID == track.ID:
+                    break
+            else:
+                # remove this distribution if we not loner have the group track
+                IDs_remove.append(ID)
+        for ID in IDs_remove:
+            self.cluster_trusts.pop(ID)
+
         # cluster-based trust measurements
         for group_track in group_tracks:
             trust_msmt_cluster = self.cluster_scorer(group_track, agents)

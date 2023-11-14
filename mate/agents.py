@@ -164,11 +164,11 @@ class CommandCenter:
         self.t = self.world.t
         agents = self.world.agents
         tracks_in = self.world.pull_tracks(timestamp=self.t, with_timestamp=False)
-        tracks_out, trusts = self.pipeline(
+        tracks_out, cluster_trusts, agent_trusts = self.pipeline(
             agents=agents,
             tracks_in=tracks_in,
             platform=self.platform,
             frame=self.frame,
             timestamp=self.t,
         )
-        return tracks_out, trusts
+        return tracks_out, cluster_trusts, agent_trusts
