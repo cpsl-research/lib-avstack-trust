@@ -1,7 +1,7 @@
-from typing import Any
+from typing import Any, List
 
 from avstack.config import ALGORITHMS, PIPELINE
-from avstack.modules.clustering.clusterers import ClusterSet
+from avstack.modules.tracking.tracks import GroupTrack
 
 
 class _TrustPipeline:
@@ -11,9 +11,9 @@ class _TrustPipeline:
 @PIPELINE.register_module()
 class NoTrustPipeline(_TrustPipeline):
     def __call__(
-        self, clusters: ClusterSet, agents: list, *args: Any, **kwds: Any
+        self, group_tracks: List[GroupTrack], agents: list, *args: Any, **kwds: Any
     ) -> Any:
-        return [None] * len(clusters), [None] * len(agents)
+        return [None] * len(group_tracks), [None] * len(agents)
 
 
 @PIPELINE.register_module()
@@ -31,17 +31,18 @@ class PointBasedTrustPipeline(_TrustPipeline):
         self.agent_trusts = {}
 
     def __call__(
-        self, clusters: ClusterSet, agents: list, *args: Any, **kwds: Any
+        self, group_tracks: List[GroupTrack], agents: list, *args: Any, **kwds: Any
     ) -> Any:
 
+
         # cluster-based trust measurements
-        t_msmts_cluster = [self.cluster_scorer(cluster, agents) for cluster in clusters]
+        t_msmts_cluster = [self.cluster_scorer(group_track, agents) for group_track in group_tracks]
 
         # cluster-based agent measurements
-        t_msmts_agent = [self.agent_scorer(agent, agents, clusters) for agent in agents]
+        t_msmts_agent = [self.agent_scorer(agent, agents, group_tracks) for agent in agents]
 
         # trust estimations
-        cluster_trusts = [None] * len(clusters)
+        cluster_trusts = [None] * len(group_tracks)
         agent_trusts = [None] * len(agents)
 
         return cluster_trusts, agent_trusts
