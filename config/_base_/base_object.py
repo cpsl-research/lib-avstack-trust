@@ -1,8 +1,9 @@
 # model for an object in the scene
 
-initialization = dict(
+object = dict(
+    type="Object",
     spawn=dict(type="RandomPoseTwist"),
-    dynamics=dict(
+    motion=dict(
         type="ConstantSpeedMarkovTurn",
         sigma_roll=0,
         sigma_pitch=0,

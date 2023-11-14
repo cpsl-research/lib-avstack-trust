@@ -1,19 +1,24 @@
 import itertools
+from typing import List
 
-from avstack.geometry import ReferenceFrame
+from avstack.config import AGENTS, MODELS, PIPELINE, ConfigDict
+from avstack.geometry import GlobalOrigin3D, ReferenceFrame
 
 
+@AGENTS.register_module()
 class Object:
     _ids = itertools.count()
 
-    def __init__(self, pose, twist, motion, ID_force=None) -> None:
+    def __init__(self, spawn, motion, world, ID_force=None) -> None:
         if ID_force:
             self.ID = ID_force
         else:
             self.ID = next(Object._ids)
-        self.pose = pose
-        self.twist = twist
-        self.motion = motion
+        if world is None:
+            raise TypeError("Need to set world before initializing")
+        self.pose, self.twist, _ = MODELS.build(spawn)(world)
+        motion.extent = world.extent
+        self.motion = MODELS.build(motion)
 
     @property
     def position(self):
@@ -40,25 +45,49 @@ class Object:
             return Object(pose, twist, self.motion, ID_force=self.ID)
 
 
+@AGENTS.register_module()
 class Agent:
     _ids = itertools.count()
 
-    def __init__(self, pose, twist, trusted, world) -> None:
+    def __init__(
+        self,
+        trusted,
+        spawn,
+        motion,
+        communication,
+        sensing: List[ConfigDict],
+        pipeline,
+        world,
+    ) -> None:
         self.ID = next(Agent._ids)
         self.trusted = trusted
         self._trust = 1.0 if trusted else 0.5
         self.world = world
         self.t = self.world.t
-        self.pose = pose
-        self.twist = twist
+        self.pose, self.twist, _ = MODELS.build(spawn)(world)
+
+        # set self as a reference
         self._reference = ReferenceFrame(
             x=self.position.x,
             v=self.velocity.x,
             q=self.attitude.q,
             reference=self.position.reference,
         )
-        self.comms = None
-        self.pipeline = None
+
+        # initialize sensor
+        self.sensing = {
+            sensor.ID: MODELS.build(
+                sensor,
+                default_args={"reference": self.as_reference(), "extent": world.extent},
+            )
+            for sensor in sensing
+        }
+
+        # initialize pipeline
+        motion.extent = world.extent
+        self.motion = MODELS.build(motion)
+        self.comms = MODELS.build(communication)
+        self.pipeline = PIPELINE.build(pipeline, default_args={"world": world})
 
     @property
     def position(self):
@@ -92,9 +121,14 @@ class Agent:
         self.process()
 
     def process(self):
-        tracks_in = self.receive()
+        # -- sensing
+        frame = self.world.frame
+        timestamp = self.world.t
+        s_out = {
+            k: v(frame, timestamp, self.world.objects) for k, v in self.sensing.items()
+        }
         tracks_out = self.pipeline(
-            platform=self._reference, tracks_in=tracks_in, world=self.world
+            sensing=s_out, platform=self._reference, frame=frame, timestamp=timestamp
         )
         self.send(tracks=tracks_out)
 
@@ -104,7 +138,7 @@ class Agent:
 
     def receive(self):
         """Send information out into the world, receive world information"""
-        tracks = self.world.pull_tracks(self.t, self.ID)
+        tracks = self.world.pull_tracks(self.t, self.ID, with_timestamp=False)
         return tracks
 
     def plan(self):
@@ -114,16 +148,27 @@ class Agent:
         """Move based on a planned path"""
 
 
+@AGENTS.register_module()
 class CommandCenter:
     ID = -1  # special ID for the command center
 
-    def __init__(self, world) -> None:
+    def __init__(self, pipeline, world) -> None:
         self.world = world
         self.t = self.world.t
+        self.frame = self.world.frame
+        self.platform = GlobalOrigin3D
+        self.pipeline = PIPELINE.build(pipeline)
 
     def tick(self):
+        self.frame = self.world.frame
         self.t = self.world.t
         agents = self.world.agents
-        tracks_in = self.world.pull_tracks(self.t, self.ID, with_timestamp=False)
-        tracks_out = self.pipeline(agents=agents, tracks_in=tracks_in)
-        return tracks_out
+        tracks_in = self.world.pull_tracks(timestamp=self.t, with_timestamp=False)
+        tracks_out, trusts = self.pipeline(
+            agents=agents,
+            tracks_in=tracks_in,
+            platform=self.platform,
+            frame=self.frame,
+            timestamp=self.t,
+        )
+        return tracks_out, trusts

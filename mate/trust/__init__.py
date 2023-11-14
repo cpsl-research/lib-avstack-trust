@@ -1,8 +1,4 @@
-import mate.trust.estimate
-import mate.trust.measurement
-import mate.trust.state
-
-from .pipeline import PointBasedTrustCIFusion
+from . import estimate, measurement, pipeline, state
 
 
-__all__ = ["PointBasedTrustCIFusion"]
+__all__ = ["estimate", "measurement", "pipeline", "state"]

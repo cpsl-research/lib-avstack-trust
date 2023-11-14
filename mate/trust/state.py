@@ -1,4 +1,3 @@
-
 class _TrustInformedWrapper:
     def __init__(self, element, estimator) -> None:
         self.element = element

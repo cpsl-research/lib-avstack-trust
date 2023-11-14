@@ -1,37 +1,37 @@
-from typing import Any
+from typing import Any, List
 
-from avstack.geometry import GlobalOrigin3D
+from avstack.config import ALGORITHMS, PIPELINE, ConfigDict
+from avstack.geometry import ReferenceFrame
 
 
+@PIPELINE.register_module()
 class AgentPipeline:
     """Fusion pipeline for an agent"""
 
-    def __init__(self, sensing, perception, tracking, fusion) -> None:
-        self.sensing = {sensor.ID_local: sensor for sensor in sensing}
-        self.perception = {percep.ID_local: percep for percep in perception}
-        self.tracking = {tracker.ID_local: tracker for tracker in tracking}
-        self.fusion = fusion
+    def __init__(
+        self,
+        perception: List[ConfigDict],
+        tracking: List[ConfigDict],
+        world=None,
+    ) -> None:
+        self.perception = {percep.ID: ALGORITHMS.build(percep) for percep in perception}
+        self.tracking = {tracker.ID: ALGORITHMS.build(tracker) for tracker in tracking}
 
     def __call__(
-        self, platform, tracks_in: dict, world, *args: Any, **kwds: Any
+        self, sensing, platform, frame, timestamp, *args: Any, **kwds: Any
     ) -> list:
-        # -- sensing
-        s_out = {
-            k: v(world.frame, world.t, world.objects) for k, v in self.sensing.items()
-        }
-
         # -- perception
         p_out = {
-            k: v(*[s_out[ks] for ks in v.sensor_ID_input])
+            k: v(*[sensing[ks] for ks in v.ID_input])
             for k, v in self.perception.items()
         }
 
         # -- tracking
         t_out = {
             k: v(
-                frame=world.frame,
-                t=world.t,
-                detections=[p_out[kp] for kp in v.percep_ID_input][
+                frame=frame,  # TODO: make this the perception data output time and frame
+                t=timestamp,
+                detections=[p_out[kp] for kp in v.ID_input][
                     0
                 ],  # HACK for only 1 percep input...
                 platform=platform,
@@ -39,28 +39,36 @@ class AgentPipeline:
             for k, v in self.tracking.items()
         }
 
-        # -- fusion
-        f_out = self.fusion(t_out, tracks_in)
-
-        return f_out
+        return t_out
 
 
+@PIPELINE.register_module()
 class CommandCenterPipeline:
     """Fusion pipeline for the command center"""
 
-    def __init__(self, clustering, fusion, trust) -> None:
-        self.clustering = clustering
-        self.fusion = fusion
-        self.trust = trust
+    def __init__(
+        self, clustering: ConfigDict, group_tracking: ConfigDict, trust: ConfigDict
+    ) -> None:
+        self.clustering = ALGORITHMS.build(clustering)
+        self.group_tracking = ALGORITHMS.build(group_tracking)
+        self.trust = PIPELINE.build(trust)
 
-    def __call__(self, agents: list, tracks_in: dict, *args: Any, **kwds: Any) -> list:
-        cluster_inputs = []
-        for agent_ID, track in tracks_in.items():
-            track.apply(
-                "change_reference", reference=GlobalOrigin3D, inplace=True
-            )  # eventually inplace=False
-            cluster_inputs.append((agent_ID, track))
-        clusters = self.clustering(*cluster_inputs)
-        fuseds = self.fusion(clusters)
-        trusts = self.trust(clusters, fuseds, agents)
-        return fuseds, trusts
+    def __call__(
+        self,
+        agents: list,
+        tracks_in: dict,
+        platform: ReferenceFrame,
+        frame: int,
+        timestamp: float,
+        *args: Any,
+        **kwds: Any
+    ) -> list:
+        for tracks in tracks_in.values():
+            tracks.apply("change_reference", reference=platform, inplace=True)
+        clusters = self.clustering(objects=tracks_in, frame=frame, timestamp=timestamp)
+        group_tracks = self.group_tracking(
+            clusters=clusters, platform=platform, frame=frame, timestamp=timestamp
+        )
+        group_tracks = [track for track in group_tracks if len(track.members) > 0]
+        trusts = self.trust(clusters=group_tracks, agents=agents)
+        return group_tracks, trusts

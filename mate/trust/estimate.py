@@ -1,6 +1,7 @@
 from typing import Union
 
 import numpy as np
+from avstack.config import ALGORITHMS, MODELS
 from avstack.datastructs import PriorityQueue
 
 from mate.distribution import _Distribution
@@ -17,10 +18,11 @@ class _TrustEstimator:
         raise NotImplementedError
 
 
+@ALGORITHMS.register_module()
 class MaximumLikelihoodTrustEstimator(_TrustEstimator):
     def __init__(
         self,
-        dist: _Distribution,
+        distribution: _Distribution,
         update_rate: float = 10,
         time_window: Union[int, None] = None,
         forgetting: float = 0.0,
@@ -36,7 +38,7 @@ class MaximumLikelihoodTrustEstimator(_TrustEstimator):
             time_window: the amount of time back to use trust measurements
             forgetting: the amount of variance inflation to add during propagation (amt / second)
         """
-        self.dist = dist
+        self.dist = MODELS.build(distribution)
         self.update_rate = update_rate
         self.t_last_update = None
         self.t_last_prop = None
@@ -88,9 +90,11 @@ class MaximumLikelihoodTrustEstimator(_TrustEstimator):
                 pass
 
 
+@ALGORITHMS.register_module()
 class ParticleFilterTrustEstimator(_TrustEstimator):
     pass
 
 
+@ALGORITHMS.register_module()
 class GaussianMixtureTrustEstimator(_TrustEstimator):
     pass

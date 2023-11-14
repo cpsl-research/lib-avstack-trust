@@ -1,16 +1,19 @@
+from avstack.config import MODELS
 from avstack.geometry import GlobalOrigin3D
 
 
+@MODELS.register_module()
 class World:
-    def __init__(self, dt, extent) -> None:
+    def __init__(self, dt, dimensions, extent) -> None:
         self._object_map = {}
         self._agent_map = {}
         self.tracks = {}
         self.frame = 0
         self.t = 0
         self.dt = dt
+        self.dimensions = dimensions
         self.extent = extent
-        self.origin = GlobalOrigin3D
+        self.reference = GlobalOrigin3D
 
     @property
     def objects(self):
@@ -33,7 +36,7 @@ class World:
     def add_agent(self, agent):
         if agent.ID not in self._agent_map:
             self._agent_map[agent.ID] = agent
-            self.tracks[agent.ID] = (None, [])
+            self.tracks[agent.ID] = (None, {})
 
     def get_neighbors(self, agent_ID):
         """Get all agent neighbors of some agent"""
@@ -50,12 +53,11 @@ class World:
         """Receive all tracks from an agent"""
         self.tracks[agent_ID] = (timestamp, tracks)
 
-    def pull_tracks(self, timestamp, agent_ID, with_timestamp=False):
+    def pull_tracks(self, timestamp, with_timestamp=False):
         """Give all tracks to an agent if in range"""
-        sends = {}
-        for ID in self.get_neighbors(agent_ID):
-            if with_timestamp:
-                sends[ID] = self.tracks[ID]
-            else:
-                sends[ID] = self.tracks[ID][1]
+        assert not with_timestamp
+        sends = {
+            ID: (self.tracks[ID][1][0] if len(self.tracks[ID][1]) > 0 else [])
+            for ID in self.tracks
+        }  # HACK for only 1 tracker per agent
         return sends

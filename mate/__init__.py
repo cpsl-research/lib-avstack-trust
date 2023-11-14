@@ -1,18 +1,12 @@
-import mate.simulation
-
-from .simulation.agents import Agent, CommandCenter, Object
-from .simulation.bootstrap import (
-    load_scenario_from_config,
-    load_scenario_from_config_file,
-)
-from .simulation.world import World
+from . import agents, connectives, distribution, pipeline, simulation, trust, wrappers
 
 
 __all__ = [
-    "Object",
-    "Agent",
-    "CommandCenter",
-    "World",
-    "load_scenario_from_config",
-    "load_scenario_from_config_file",
+    "agents",
+    "connectives",
+    "distribution",
+    "pipeline",
+    "simulation",
+    "trust",
+    "wrappers",
 ]

@@ -1,3 +1,6 @@
+from avstack.config import MODELS
+
+
 class DeMorganTriple:
     """Abstract base class for a DeMorgan triple connective"""
 
@@ -14,6 +17,7 @@ class DeMorganTriple:
         raise NotImplementedError
 
 
+@MODELS.register_module()
 class StandardCrisp(DeMorganTriple):
     @staticmethod
     def norm(a: bool, b: bool) -> bool:
@@ -28,6 +32,7 @@ class StandardCrisp(DeMorganTriple):
         return not a
 
 
+@MODELS.register_module()
 class StandardFuzzy(DeMorganTriple):
     @staticmethod
     def norm(a: float, b: float) -> float:

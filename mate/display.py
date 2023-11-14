@@ -132,22 +132,22 @@ class MainWindow(QtWidgets.QMainWindow):
         )
 
         # -- plot objects
-        for obj_ID, obj in datastruct["objects"].items():
+        for obj in datastruct["objects"]:
             obj.change_reference(GlobalOrigin3D, inplace=True)
             datastruct["pts"].extend(
                 axis.plot(obj.position.x[0], obj.position.x[1], obj_color + "o")
             )
 
         # -- plot agents
-        for agent_ID, agent in datastruct["agents"].items():
+        for agent in datastruct["agents"]:
             color = root_color if agent.trusted else rad_color
             datastruct["pts"].extend(
                 axis.plot(agent.position.x[0], agent.position.x[1], color + "o")
             )
             # -- fov wedge
             if datastruct["show_fov"]:
-                sens = agent.pipeline.sensing[
-                    list(agent.pipeline.sensing.keys())[0]
+                sens = agent.sensing[
+                    list(agent.sensing.keys())[0]
                 ]  # HACK for only 1 sensor
                 s_ref = sens.as_reference()
                 s_global = s_ref.integrate(start_at=GlobalOrigin3D)

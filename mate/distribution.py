@@ -1,6 +1,7 @@
 from typing import Union
 
 import numpy as np
+from avstack.config import MODELS
 from scipy import stats
 
 
@@ -29,6 +30,7 @@ class _Distribution:
         raise NotImplementedError
 
 
+@MODELS.register_module()
 class Beta(_Distribution):
     def __init__(
         self,
@@ -131,6 +133,7 @@ class Beta(_Distribution):
             raise NotImplementedError(param)
 
 
+@MODELS.register_module()
 class OddsBeta(Beta):
     "Also called beta prime distribution"
 
@@ -178,18 +181,22 @@ class OddsBeta(Beta):
             raise NotImplementedError(param)
 
 
+@MODELS.register_module()
 class LogBeta(Beta):
     pass
 
 
+@MODELS.register_module()
 class LogOddsBeta(OddsBeta):
     pass
 
 
+@MODELS.register_module()
 class GaussianMixture(_Distribution):
     pass
 
 
+@MODELS.register_module()
 class Weibull(_Distribution):
     def __init__(
         self,
@@ -217,6 +224,7 @@ class Weibull(_Distribution):
     def lam(self, lam):
         if lam <= 0:
             raise ValueError("lambda must be greater than 0")
+        self._lam = lam
 
     @property
     def scale(self):
@@ -256,6 +264,7 @@ class Exponential(_Distribution):
         return stats.expon.cdf(x, loc=0, scale=self.scale)
 
 
+@MODELS.register_module()
 class Chi2(_Distribution):
     def __init__(self, df: float) -> None:
         self.df = df

@@ -1,4 +1,5 @@
 import numpy as np
+from avstack.config import MODELS
 from avstack.geometry import transform_orientation
 
 
@@ -49,11 +50,13 @@ class MotionModel:
         return pose, twist
 
 
+@MODELS.register_module()
 class Stationary(MotionModel):
     def _tick(self, pose, twist, dt):
         return pose, twist
 
 
+@MODELS.register_module()
 class ConstantSpeedMarkovTurn(MotionModel):
     def __init__(self, extent, sigma_roll=0, sigma_pitch=0, sigma_yaw=1) -> None:
         self.sigma_roll = sigma_roll
@@ -74,6 +77,7 @@ class ConstantSpeedMarkovTurn(MotionModel):
         return pose, twist
 
 
+@MODELS.register_module()
 class ConstantSpeedConstantTurn(MotionModel):
     def __init__(self, extent, radius=10, **kwargs) -> None:
         super().__init__(extent)
@@ -90,6 +94,7 @@ class ConstantSpeedConstantTurn(MotionModel):
         return pose, twist
 
 
+@MODELS.register_module()
 class MarkovAcceleration:
     def __init__(self, ax, ay, az) -> None:
         pass

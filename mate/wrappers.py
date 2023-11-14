@@ -1,10 +1,13 @@
 from typing import Any
 
+from avstack.config import ALGORITHMS, MODELS
+
 
 class _Wrapper:
-    def __init__(self, model, ID_local) -> None:
+    def __init__(self, model, ID, ID_input) -> None:
         self.model = model
-        self.ID_local = ID_local
+        self.ID = ID
+        self.ID_input = ID_input
 
     def __call__(self, *args: Any, **kwds: Any) -> Any:
         return self.model(*args, **kwds)
@@ -13,18 +16,29 @@ class _Wrapper:
         return getattr(self.model, name)
 
 
+@MODELS.register_module()
 class SensorWrapper(_Wrapper):
-    def __init__(self, model, ID_local) -> None:
-        super().__init__(model, ID_local)
+    def __init__(self, model, ID, **kwargs) -> None:
+        model = MODELS.build(model, default_args=kwargs)
+        super().__init__(model, ID, ID_input=[])
 
 
+@ALGORITHMS.register_module()
 class PerceptionWrapper(_Wrapper):
-    def __init__(self, model, ID_local, sensor_ID_input) -> None:
-        super().__init__(model, ID_local)
-        self.sensor_ID_input = sensor_ID_input
+    def __init__(self, algorithm, ID, ID_input, **kwargs) -> None:
+        algorithm = ALGORITHMS.build(algorithm, default_args=kwargs)
+        super().__init__(algorithm, ID, ID_input)
 
 
+@ALGORITHMS.register_module()
 class TrackingWrapper(_Wrapper):
-    def __init__(self, model, ID_local, percep_ID_input) -> None:
-        super().__init__(model, ID_local)
-        self.percep_ID_input = percep_ID_input
+    def __init__(self, algorithm, ID, ID_input, **kwargs) -> None:
+        algorithm = ALGORITHMS.build(algorithm, default_args=kwargs)
+        super().__init__(algorithm, ID, ID_input)
+
+
+@ALGORITHMS.register_module()
+class ClusteringWrapper(_Wrapper):
+    def __init__(self, algorithm, ID, ID_input, **kwargs) -> None:
+        algorithm = ALGORITHMS.build(algorithm, default_args=kwargs)
+        super().__init__(algorithm, ID, ID_input)
