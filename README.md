@@ -1,4 +1,4 @@
-# Multi Agent Trust Kalman Filter
+# Multi Agent Trust Estimator
 
 ## Installation
 

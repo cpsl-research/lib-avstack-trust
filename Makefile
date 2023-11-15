@@ -1,4 +1,4 @@
-NAME := matk
+NAME := mate
 INSTALL_STAMP := .install.stamp
 POETRY := $(shell command -v poetry 2> /dev/null)
 .DEFAULT_GOAL := help
@@ -20,6 +20,10 @@ $(INSTALL_STAMP): pyproject.toml poetry.lock
 		@if [ -z $(POETRY) ]; then echo "Poetry could not be found. See https://python-poetry.org/docs/"; exit 2; fi
 		$(POETRY) install
 		touch $(INSTALL_STAMP)
+
+.PHONY: simulation
+simulation: $(INSTALL_STAMP)
+	$(POETRY) run python analysis/run_scenario.py config/scenarios/test_scenario.py --display
 
 .PHONY: clean
 clean:

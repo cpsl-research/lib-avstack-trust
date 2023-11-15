@@ -1,6 +1,7 @@
 import random
 
 import numpy as np
+from avstack.config import MODELS
 from avstack.geometry import (
     AngularVelocity,
     Attitude,
@@ -38,3 +39,9 @@ def random_pose_twist(extent, reference, vmin=2, vmax=5, vsig=2, buffer=10):
         x=pose.position.x, v=twist.linear.x, q=pose.attitude.q, reference=reference
     )
     return pose, twist, point_as_ref
+
+
+@MODELS.register_module()
+class RandomPoseTwist:
+    def __call__(self, world):
+        return random_pose_twist(extent=world.extent, reference=world.reference)

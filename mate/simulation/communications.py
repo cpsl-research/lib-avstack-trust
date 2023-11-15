@@ -1,3 +1,6 @@
+from avstack.config import MODELS
+
+
 class CommsModel:
     def __init__(self, rate, max_range, send, receive) -> None:
         self.rate = rate
@@ -9,6 +12,7 @@ class CommsModel:
         raise NotImplementedError
 
 
+@MODELS.register_module()
 class Omnidirectional(CommsModel):
     def __init__(
         self, rate="continuous", max_range=100, send=True, receive=True

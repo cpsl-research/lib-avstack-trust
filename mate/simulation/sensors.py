@@ -1,6 +1,7 @@
 import itertools
 
 import numpy as np
+from avstack.config import MODELS
 from avstack.datastructs import DataContainer
 from avstack.geometry import GlobalOrigin3D, Position, ReferenceFrame
 from avstack.geometry.transformations import cartesian_to_spherical
@@ -10,7 +11,9 @@ from avstack.modules.perception.detections import RazDetection
 class SensorModel:
     _ids = itertools.count()
 
-    def __init__(self, x, q, reference, noise, extent, fov, Pd=0.95, Dfa=1e-6) -> None:
+    def __init__(
+        self, x, q, noise, reference, extent, fov, ID=None, Pd=0.95, Dfa=1e-6
+    ) -> None:
         """Base class for an observation model
 
         noise  - component-wise noise model
@@ -19,7 +22,7 @@ class SensorModel:
         Pd     - probability of detection of a true object
         Dfa    - density of false alarms in 1/m^2
         """
-        self.ID = next(SensorModel._ids)
+        self.ID = ID if ID else next(SensorModel._ids)
         self.x = x
         self.q = q
         self.Pd = Pd
@@ -43,7 +46,7 @@ class SensorModel:
 
         # -- make measurements
         detections = []
-        for i, objs in enumerate((list(objects.values()), objs_fp)):
+        for i, objs in enumerate((objects, objs_fp)):
             for obj in objs:
                 # -- check in fov
                 if not isinstance(obj, Position):
@@ -65,9 +68,12 @@ class SensorModel:
         raise NotImplementedError
 
 
+@MODELS.register_module()
 class PositionSensor(SensorModel):
-    def __init__(self, x, q, reference, noise, extent, fov, Pd=0.95, Dfa=1e-6) -> None:
-        super().__init__(x, q, reference, noise, extent, fov, Pd=Pd, Dfa=Dfa)
+    def __init__(
+        self, x, q, noise, reference, extent, fov, ID=None, Pd=0.95, Dfa=1e-6
+    ) -> None:
+        super().__init__(x, q, noise, reference, extent, fov, ID=ID, Pd=Pd, Dfa=Dfa)
 
     def observe(self, sensor, obj, noisy=True):
         """Make local observation and add Gaussian noise"""

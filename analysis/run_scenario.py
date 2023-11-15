@@ -8,9 +8,10 @@ import time
 
 from avstack.config import Config
 from avstack.utils.decorators import FunctionTriggerIterationMonitor
+from bootstrap import load_scenario_from_config
 from PyQt5 import QtCore, QtWidgets
 
-from matk import display, load_scenario_from_config
+from mate import display
 
 
 def do_run(MainThread):
@@ -23,7 +24,7 @@ def do_run(MainThread):
 
     cfg = Config.fromfile(args.config_file)
     cfg_world = Config.fromfile(cfg.world)
-    extent = cfg_world.spatial.extent
+    extent = cfg_world.world.extent
 
     if args.display:
         print('Running with display...')
@@ -63,13 +64,13 @@ def _run_inner(thread, world, objects, agents, commandcenter, sleeps=0.01):
         agent.move()
 
     # -- run the central processing
-    tracks_out = commandcenter.tick()
+    tracks_out, cluster_trusts, agent_trusts = commandcenter.tick()
 
     # -- update displays
     if thread is not None:
         thread.truth_signal.emit(world.frame, world.t, world.objects, world.agents)
-        track_objs = {track.ID:track for track in tracks_out}
-        thread.estim_signal.emit(world.frame, world.t, track_objs, world.agents)
+        thread.estim_signal.emit(world.frame, world.t, tracks_out, world.agents)
+        thread.trust_signal.emit(world.frame, world.t, cluster_trusts, agent_trusts)
     time.sleep(sleeps)
 
 
@@ -77,6 +78,7 @@ class MainThread(QtCore.QThread):
     truth_signal = QtCore.pyqtSignal(int, float, object, object)
     detec_signal = QtCore.pyqtSignal(int, float, object, object)
     estim_signal = QtCore.pyqtSignal(int, float, object, object)
+    trust_signal = QtCore.pyqtSignal(int, float, object, object)
 
     def __init__(self, cfg, sleeps=0.01, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)

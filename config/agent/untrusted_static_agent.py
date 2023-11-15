@@ -1,3 +1,3 @@
 # model for our untrusted static agents
 
-_base_ = "./base_agent.py"
+_base_ = "../_base_/base_agent.py"

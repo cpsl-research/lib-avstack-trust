@@ -25,9 +25,11 @@ from PyQt5 import QtCore, QtWidgets
 
 
 class MplCanvas(FigureCanvasQTAgg):
-    def __init__(self, parent=None, width=10, height=8, dpi=100):
+    def __init__(self, parent=None, width=16, height=8, dpi=100):
         fig = Figure(figsize=(width, height), dpi=dpi)
-        self.axes = fig.subplots(1, 2)
+        self.axes = fig.subplots(1, 4, width_ratios=[4, 4, 1, 1])
+        for ax in self.axes[:2]:
+            ax.set_aspect("equal")
         super(MplCanvas, self).__init__(fig)
 
 
@@ -38,8 +40,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self._thread.truth_signal.connect(self.update_truth_data)
         self._thread.estim_signal.connect(self.update_estim_data)
         self._thread.detec_signal.connect(self.update_detect_data)
+        self._thread.trust_signal.connect(self.update_trust_data)
 
-        self.canvas = MplCanvas(self, width=14, height=8, dpi=100)
+        self.canvas = MplCanvas(self, width=20, height=8, dpi=100)
         self.setCentralWidget(self.canvas)
 
         # We need to store a reference to the plotted line
@@ -72,6 +75,15 @@ class MainWindow(QtWidgets.QMainWindow):
         self.detect = {}
         self.detect_frame_skip = 0
         self.detect_frame_buffer = 20
+        self.trusts = {
+            "supertitle": "Trusts",
+            "frame": 0,
+            "t": 0,
+            "objects": {},
+            "agents": {},
+            "lines": [],
+            "initialized": False,
+        }
 
         self._plot_ref = None
         self.update_plots()
@@ -107,7 +119,7 @@ class MainWindow(QtWidgets.QMainWindow):
         datastruct["agents"] = agents
 
     @staticmethod
-    def _update_plot(
+    def _update_scenario_plot(
         extent,
         axis,
         datastruct,
@@ -130,21 +142,23 @@ class MainWindow(QtWidgets.QMainWindow):
         )
 
         # -- plot objects
-        for obj_ID, obj in datastruct["objects"].items():
+        for obj in datastruct["objects"]:
             obj.change_reference(GlobalOrigin3D, inplace=True)
             datastruct["pts"].extend(
                 axis.plot(obj.position.x[0], obj.position.x[1], obj_color + "o")
             )
 
         # -- plot agents
-        for agent_ID, agent in datastruct["agents"].items():
+        for agent in datastruct["agents"]:
             color = root_color if agent.trusted else rad_color
             datastruct["pts"].extend(
                 axis.plot(agent.position.x[0], agent.position.x[1], color + "o")
             )
             # -- fov wedge
             if datastruct["show_fov"]:
-                sens = agent.pipeline.sensing[list(agent.pipeline.sensing.keys())[0]]  # HACK for only 1 sensor
+                sens = agent.sensing[
+                    list(agent.sensing.keys())[0]
+                ]  # HACK for only 1 sensor
                 s_ref = sens.as_reference()
                 s_global = s_ref.integrate(start_at=GlobalOrigin3D)
                 center = [s_global.x[0], s_global.x[1]]
@@ -210,6 +224,42 @@ class MainWindow(QtWidgets.QMainWindow):
             axis.set_ylabel("Y (index 1)")
             datastruct["initialized"] = True
 
+    @staticmethod
+    def _update_trust_plot(
+        agent_axis,
+        cluster_axis,
+        datastruct,
+        n_points_eval=200,
+        xmin=0.0,
+        xmax=1.0,
+        ymin=0.0,
+        ymax=3.0,
+    ):
+        for ax in [agent_axis, cluster_axis]:
+            # -- clear axes and set lims
+            ax.set_title(
+                f"{datastruct['supertitle']}\nFrame {datastruct['frame']:05d}...Time {datastruct['t']:6.2f} s"
+            )
+            for line in ax.get_lines():
+                line.remove()
+
+        # -- agent trusts
+        x = np.linspace(xmin, xmax, n_points_eval)
+        for ID, agent_trust in datastruct["agents"].items():
+            y = agent_trust.dist.pdf(x)
+            line = agent_axis.plot(x, y, label="Agent %i".format(ID))
+
+        # -- cluster trusts
+        for ID, cluster_trust in datastruct["objects"].items():
+            y = cluster_trust.dist.pdf(x)
+            line = cluster_axis.plot(x, y, label="Cluster %i".format(ID))
+
+        # -- legend
+        if not datastruct["initialized"]:
+            for ax in [agent_axis, cluster_axis]:
+                ax.set_xlim(xmin, xmax)
+                ax.set_ylim(ymin, ymax)
+
     def update_truth_data(self, frame, t, objects, agents):
         self._update_data(self.truth, frame, t, objects, agents)
 
@@ -219,8 +269,12 @@ class MainWindow(QtWidgets.QMainWindow):
     def update_detect_data(self, frame, t, obj, detections):
         self._update_detections(frame, t, obj, detections)
 
+    def update_trust_data(self, frame, t, cluster_trusts, agent_trusts):
+        self._update_data(self.trusts, frame, t, cluster_trusts, agent_trusts)
+
     def update_plots(self, obj_color="y", rad_color="r", root_color="g"):
-        self._update_plot(
+        # -- plot of the truth
+        self._update_scenario_plot(
             self.extent,
             self.canvas.axes[0],
             self.truth,
@@ -230,7 +284,8 @@ class MainWindow(QtWidgets.QMainWindow):
             rad_color,
             x_frame_buffer=0,
         )
-        self._update_plot(
+        # -- plot of the estimated/detected
+        self._update_scenario_plot(
             self.extent,
             self.canvas.axes[1],
             self.estim,
@@ -240,4 +295,11 @@ class MainWindow(QtWidgets.QMainWindow):
             rad_color,
             x_frame_buffer=self.detect_frame_buffer,
         )
+        # -- plot of the trusts
+        self._update_trust_plot(
+            self.canvas.axes[2],
+            self.canvas.axes[3],
+            self.trusts,
+        )
+
         self.canvas.draw()

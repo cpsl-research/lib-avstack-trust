@@ -1,13 +1,15 @@
 # model for the command center
 
-models = dict(fusion=dict(type="AggregatorFusion"))
-
-# models = dict(
-#     fusion=dict(
-#         type="CovarianceIntersectionFusion",
-#         clustering=dict(
-#             type="SampledAssignmentClustering",
-#             assign_radius=8.0,
-#         ),
-#     ),
-# )
+commandcenter = dict(
+    type="CommandCenter",
+    pipeline=dict(
+        type="CommandCenterPipeline",
+        clustering=dict(type="SampledAssignmentClusterer", assign_radius=2.0),
+        group_tracking=dict(
+            type="GroupTrackerWrapper",
+            fusion=dict(type="CovarianceIntersectionFusion"),
+            tracker=dict(type="BasicXyTracker"),
+        ),
+        trust=dict(type="NoTrustPipeline"),
+    ),
+)
