@@ -4,3 +4,6 @@
 [submodule "submodules/lib-avstack-api"]
 	path = third_party/lib-avstack-api
 	url = https://github.com/avstack-lab/lib-avstack-api
+[submodule "third_party/traffic-simulator"]
+	path = third_party/traffic-simulator
+	url = https://github.com/cpsl-research/traffic-simulator.git
