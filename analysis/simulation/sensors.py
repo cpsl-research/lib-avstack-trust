@@ -1,4 +1,5 @@
 import itertools
+from typing import Tuple
 
 import numpy as np
 from avstack.config import MODELS
@@ -71,7 +72,16 @@ class SensorModel:
 @MODELS.register_module()
 class PositionSensor(SensorModel):
     def __init__(
-        self, x, q, noise, reference, extent, fov, ID=None, Pd=0.95, Dfa=1e-6
+        self,
+        extent: Tuple[Tuple, Tuple, Tuple],
+        reference: ReferenceFrame,
+        x: np.ndarray = np.zeros((3,)),
+        q: np.quaternion = np.quaternion(1),
+        noise: np.ndarray = np.zeros((3,)),
+        fov: float = 2 * np.pi,
+        ID=None,
+        Pd=0.95,
+        Dfa=1e-6,
     ) -> None:
         super().__init__(x, q, noise, reference, extent, fov, ID=ID, Pd=Pd, Dfa=Dfa)
 

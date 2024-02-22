@@ -24,8 +24,11 @@ agents = [
         "spawn": {"type": "RandomPoseTwist"},
         "motion": {"type": "ConstantSpeedConstantTurn"},
         "communication": {"type": "Omnidirectional"},
-        "pipeline": {"type": "NoTrustPipeline"},
-        "sensing": [],
+        "sensing": [{"type": "PositionSensor"}],
+        "pipeline": {
+            "type": "SerialPipeline",
+            "modules": [{"type": "BasicXyzTracker"}],
+        },
     }
     for _ in range(_n_agents)
 ]

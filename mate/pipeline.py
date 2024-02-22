@@ -1,6 +1,6 @@
 from typing import Any, List
 
-from avstack.config import ALGORITHMS, PIPELINE
+from avstack.config import MODELS, PIPELINE
 from avstack.modules.tracking.tracks import GroupTrack
 
 
@@ -23,8 +23,8 @@ class PointBasedTrustPipeline(_TrustPipeline):
         self, cluster_scorer, agent_scorer, trust_estimator, *args, **kwds
     ) -> None:
         # algorithms
-        self.cluster_scorer = ALGORITHMS.build(cluster_scorer)
-        self.agent_scorer = ALGORITHMS.build(agent_scorer)
+        self.cluster_scorer = MODELS.build(cluster_scorer)
+        self.agent_scorer = MODELS.build(agent_scorer)
         self.cluster_trust_estimator = trust_estimator
         self.agent_trust_estimator = trust_estimator
 
@@ -57,7 +57,7 @@ class PointBasedTrustPipeline(_TrustPipeline):
         for group_track in group_tracks:
             trust_msmt_cluster = self.cluster_scorer(group_track, agents)
             if group_track.ID not in self.cluster_trusts:
-                self.cluster_trusts[group_track.ID] = ALGORITHMS.build(
+                self.cluster_trusts[group_track.ID] = MODELS.build(
                     self.cluster_trust_estimator
                 )
             self.cluster_trusts[group_track.ID].update(
@@ -73,9 +73,7 @@ class PointBasedTrustPipeline(_TrustPipeline):
         for agent in agents:
             trust_msmt_agent = self.agent_scorer(agent, agents, group_tracks)
             if agent.ID not in self.agent_trusts:
-                self.agent_trusts[agent.ID] = ALGORITHMS.build(
-                    self.agent_trust_estimator
-                )
+                self.agent_trusts[agent.ID] = MODELS.build(self.agent_trust_estimator)
             self.agent_trusts[agent.ID].update(
                 timestamp=timestamp, trust=trust_msmt_agent
             )

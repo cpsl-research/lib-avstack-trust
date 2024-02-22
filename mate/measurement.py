@@ -8,7 +8,7 @@ if TYPE_CHECKING:
     from mate.connectives import _DeMorganTriple, StandardFuzzy
 
 import numpy as np
-from avstack.config import ALGORITHMS, MODELS, ConfigDict
+from avstack.config import MODELS, ConfigDict
 from avstack.geometry.datastructs import Pose
 from avstack.modules.tracking.tracks import _TrackBase
 
@@ -129,7 +129,7 @@ class PseudoMeasurementBase:
         return self.connective.negation(a)
 
 
-@ALGORITHMS.register_module()
+@MODELS.register_module()
 class AgentScorer(PseudoMeasurementBase):
     def __init__(
         self,
@@ -140,7 +140,7 @@ class AgentScorer(PseudoMeasurementBase):
         },
     ) -> None:
         super().__init__(connective)
-        self.clusterer = ALGORITHMS.build(clusterer)
+        self.clusterer = MODELS.build(clusterer)
 
     def __call__(
         self,
@@ -273,12 +273,12 @@ class AgentScorer(PseudoMeasurementBase):
         return score, uncertainty
 
 
-@ALGORITHMS.register_module()
+@MODELS.register_module()
 class AgentObjectLocalScorer(PseudoMeasurementBase):
     pass
 
 
-@ALGORITHMS.register_module()
+@MODELS.register_module()
 class AgentFreeSpaceScorer(PseudoMeasurementBase):
     def __call__(
         self,
@@ -302,7 +302,7 @@ class AgentFreeSpaceScorer(PseudoMeasurementBase):
         raise NotImplementedError
 
 
-@ALGORITHMS.register_module()
+@MODELS.register_module()
 class ClusterScorer(PseudoMeasurementBase):
     def __init__(self, connective: "_DeMorganTriple") -> None:
         super().__init__(connective=connective)

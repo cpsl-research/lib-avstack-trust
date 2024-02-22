@@ -6,6 +6,7 @@ import random
 import sys
 import time
 
+import avstack  # noqa # pylint: disable=unused-import
 from avstack.config import AGENTS, MODELS, Config
 from avstack.utils.decorators import FunctionTriggerIterationMonitor
 from PyQt5 import QtCore, QtWidgets

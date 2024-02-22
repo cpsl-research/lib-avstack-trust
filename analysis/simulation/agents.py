@@ -78,19 +78,20 @@ class _Agent:
         )
 
         # initialize sensor
-        self.sensing = {
-            sensor.ID: MODELS.build(
+        sensors = [
+            MODELS.build(
                 sensor,
                 default_args={"reference": self.as_reference(), "extent": world.extent},
             )
             for sensor in sensing
-        }
+        ]
+        self.sensing = {sensor.ID: sensor for sensor in sensors}
 
         # initialize pipeline
         motion.extent = world.extent
         self.motion = MODELS.build(motion)
         self.comms = MODELS.build(communication)
-        self.pipeline = PIPELINE.build(pipeline, default_args={"world": world})
+        self.pipeline = PIPELINE.build(pipeline)
 
     @property
     def position(self):
