@@ -5,15 +5,14 @@ from avstack.config import AGENTS, MODELS, PIPELINE, ConfigDict
 from avstack.geometry import GlobalOrigin3D, ReferenceFrame
 
 
-@AGENTS.register_module()
-class Object:
+class _Object:
     _ids = itertools.count()
 
     def __init__(self, spawn, motion, world, ID_force=None) -> None:
         if ID_force:
             self.ID = ID_force
         else:
-            self.ID = next(Object._ids)
+            self.ID = next(_Object._ids)
         if world is None:
             raise TypeError("Need to set world before initializing")
         self.pose, self.twist, _ = MODELS.build(spawn)(world)
@@ -42,11 +41,15 @@ class Object:
         else:
             pose = self.pose.change_reference(reference, inplace=inplace)
             twist = self.twist.change_reference(reference, inplace=inplace)
-            return Object(pose, twist, self.motion, ID_force=self.ID)
+            return _Object(pose, twist, self.motion, ID_force=self.ID)
 
 
 @AGENTS.register_module()
-class Agent:
+class BasicObject(_Object):
+    pass
+
+
+class _Agent:
     _ids = itertools.count()
 
     def __init__(
@@ -59,7 +62,7 @@ class Agent:
         pipeline,
         world,
     ) -> None:
-        self.ID = next(Agent._ids)
+        self.ID = next(_Agent._ids)
         self.trusted = trusted
         self._trust = 1.0 if trusted else 0.5
         self.world = world
@@ -149,7 +152,11 @@ class Agent:
 
 
 @AGENTS.register_module()
-class CommandCenter:
+class BasicAgent(_Agent):
+    pass
+
+
+class _CommandCenter:
     ID = -1  # special ID for the command center
 
     def __init__(self, pipeline, world) -> None:
@@ -172,3 +179,8 @@ class CommandCenter:
             timestamp=self.t,
         )
         return tracks_out, cluster_trusts, agent_trusts
+
+
+@AGENTS.register_module()
+class BasicCommandCenter(_CommandCenter):
+    pass

@@ -6,36 +6,65 @@ import random
 import sys
 import time
 
-from avstack.config import Config
+from avstack.config import AGENTS, MODELS, Config
 from avstack.utils.decorators import FunctionTriggerIterationMonitor
-from bootstrap import load_scenario_from_config
 from PyQt5 import QtCore, QtWidgets
+from simulation import display
 
-from . import display
+import mate  # noqa # pylint: disable=unused-import
+
+
+def load_scenario_from_config_file(filename: str):
+    cfg = Config.fromfile(filename=filename)
+    return load_scenario_from_config(cfg)
+
+
+def load_scenario_from_config(cfg, world=None):
+    # -- world
+    if world is None:
+        world = MODELS.build(cfg.world)
+
+    # -- objects
+    objects = []
+    for cfg_obj in cfg.objects:
+        obj = AGENTS.build(cfg_obj, default_args={"world": world})
+        objects.append(obj)
+        world.add_object(obj)
+
+    # -- agents
+    agents = []
+    for cfg_agent in cfg.agents:
+        agent = AGENTS.build(cfg_agent, default_args={"world": world})
+        agents.append(agent)
+        world.add_agent(agent)
+
+    # -- command center
+    commandcenter = AGENTS.build(cfg.commandcenter, default_args={"world": world})
+
+    return world, objects, agents, commandcenter
 
 
 def do_run(MainThread):
     parser = argparse.ArgumentParser()
-    parser.add_argument('config_file', type=str, help='Path to scenario config file')
-    parser.add_argument('--display', action="store_true")
-    parser.add_argument('--debug', action="store_true")
-    parser.add_argument('--sleeps', default=0.01)
+    parser.add_argument("config_file", type=str, help="Path to scenario config file")
+    parser.add_argument("--display", action="store_true")
+    parser.add_argument("--debug", action="store_true")
+    parser.add_argument("--sleeps", default=0.01)
     args = parser.parse_args()
 
     cfg = Config.fromfile(args.config_file)
-    cfg_world = Config.fromfile(cfg.world)
-    extent = cfg_world.world.extent
+    world = MODELS.build(cfg.world)
+    extent = world.extent
 
     if args.display:
-        print('Running with display...')
+        print("Running with display...")
         app = QtWidgets.QApplication(sys.argv)
         window = display.MainWindow(extent=extent, thread=MainThread(cfg, args.sleeps))
         app.exec_()
     else:
-        print('Running without display...')
+        print("Running without display...")
         if args.debug:
-            world, objects, agents, commandcenter = \
-                load_scenario_from_config(cfg)
+            world, objects, agents, commandcenter = load_scenario_from_config(cfg)
             while True:
                 _run_inner(
                     thread=None,
@@ -43,13 +72,13 @@ def do_run(MainThread):
                     objects=objects,
                     agents=agents,
                     commandcenter=commandcenter,
-                    sleeps=args.sleeps
+                    sleeps=args.sleeps,
                 )
         else:
-            MainThread(cfg, args.sleeps).run()
+            MainThread(cfg, args.sleeps, world=world).run()
 
 
-@FunctionTriggerIterationMonitor(print_rate=1/2)
+@FunctionTriggerIterationMonitor(print_rate=1 / 2)
 def _run_inner(thread, world, objects, agents, commandcenter, sleeps=0.01):
     world.tick()
     random.shuffle(agents)
@@ -80,14 +109,19 @@ class MainThread(QtCore.QThread):
     estim_signal = QtCore.pyqtSignal(int, float, object, object)
     trust_signal = QtCore.pyqtSignal(int, float, object, object)
 
-    def __init__(self, cfg, sleeps=0.01, *args, **kwargs) -> None:
+    def __init__(self, cfg, sleeps=0.01, world=None, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self.initialize(cfg)
         self.sleeps = sleeps
+        self.world = world
+        self.initialize(cfg)
 
     def initialize(self, cfg):
-        self.world, self.objects, self.agents, self.commandcenter = \
-            load_scenario_from_config(cfg)
+        (
+            self.world,
+            self.objects,
+            self.agents,
+            self.commandcenter,
+        ) = load_scenario_from_config(cfg, world=self.world)
 
     def run(self):
         try:
@@ -98,7 +132,7 @@ class MainThread(QtCore.QThread):
                     objects=self.objects,
                     agents=self.agents,
                     commandcenter=self.commandcenter,
-                    sleeps=self.sleeps
+                    sleeps=self.sleeps,
                 )
         except KeyboardInterrupt:
             pass

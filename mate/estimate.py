@@ -264,8 +264,8 @@ class HierarchicalUnscentedKalmanTrustEstimator(_TrustEstimator):
         trust: Union["UncertainTrustArray", "TrustArray"],
     ) -> None:
         """We assume z is a measurement of the mean of the Beta distribution
-        and the confidence is a measurement 
-         
+        and the confidence is a measurement
+
         We must create the
         measurement function that maps the state to the measurement space
 
@@ -278,7 +278,6 @@ class HierarchicalUnscentedKalmanTrustEstimator(_TrustEstimator):
             R = np.diag(1 - trust.confidence)
         except AttributeError:
             R = np.diag(1 - self.default_confidence * np.ones((len(z),)))
-        
 
         # def kalman_unscented_update(xp, Pp, z, h_func, R):
         # H function is a

@@ -1,4 +1,4 @@
-from . import communications, motion, sensors, spawn, world
+from . import agents, communication, motion, sensors, spawn, world
 
 
-__all__ = ["communications", "motion", "sensors", "spawn", "world"]
+__all__ = ["agents", "communication", "motion", "sensors", "spawn", "world"]

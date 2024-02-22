@@ -5,7 +5,8 @@ from avstack.modules.tracking.tracks import GroupTrack
 
 
 class _TrustPipeline:
-    pass
+    def __init__(self, *args, **kwds):
+        pass
 
 
 @PIPELINE.register_module()
