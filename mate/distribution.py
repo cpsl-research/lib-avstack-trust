@@ -17,17 +17,78 @@ class _Distribution:
     def set_via_moments(self, mean: float, variance: float):
         raise NotImplementedError
 
-    def pdf(self, x: float):
+    def pdf(self, x: float) -> float:
         raise NotImplementedError
 
-    def cdf(self, x: float):
+    def cdf(self, x: float) -> float:
         raise NotImplementedError
 
-    def rvs(self, n: int):
+    def rvs(self, n: int, random_state: Union[int, None] = None) -> np.ndarray:
         raise NotImplementedError
 
     def partial(self, param: str):
         raise NotImplementedError
+
+
+@MODELS.register_module()
+class Uniform(_Distribution):
+    def __init__(self, a: float = 0.0, b: float = 1.0) -> None:
+        self.a = a
+        self.b = b
+        if a >= b:
+            raise ValueError("Limits of uniform are not consistent")
+        self.support = b - a
+        self.density = 1.0 / self.support
+
+    @property
+    def mean(self):
+        return self.b - self.support / 2
+
+    @property
+    def variance(self):
+        return self.support**2 / 12
+
+    @property
+    def loc(self):
+        return self.a
+
+    @property
+    def scale(self):
+        return self.b - self.a
+
+    def pdf(self, x: float) -> float:
+        return stats.uniform.pdf(x, loc=self.loc, scale=self.scale)
+
+    def cdf(self, x: float) -> float:
+        return max(0.0, min(1.0, self.density * (x - self.a)))
+
+    def rvs(self, n: int, random_state: Union[int, None] = None):
+        return stats.uniform.rvs(
+            loc=self.loc, scale=self.scale, size=n, random_state=random_state
+        )
+
+
+@MODELS.register_module()
+class Normal(_Distribution):
+    def __init__(self, mean: float, variance: float) -> None:
+        self.set_via_moments(mean, variance)
+
+    @property
+    def variance(self):
+        return self.sigma**2
+
+    def set_via_moments(self, mean: float, variance: float):
+        self.mean = mean
+        self.sigma = np.sqrt(variance)
+
+    def pdf(self, x: float) -> float:
+        return stats.norm.pdf(x, loc=self.mean, scale=self.sigma)
+
+    def cdf(self, x: float) -> float:
+        return stats.norm.cdf(x, loc=self.mean, scale=self.sigma)
+
+    def rvs(self, n: int, random_state: Union[int, None] = None):
+        return stats.norm.rvs(self.mean, self.sigma, size=n, random_state=random_state)
 
 
 @MODELS.register_module()
@@ -99,7 +160,7 @@ class Beta(_Distribution):
 
     @staticmethod
     def fit(x: Union[list, np.ndarray]):
-        a, b, _, _ = stats.beta.fit(x)
+        a, b, _, _ = stats.beta.fit(x, floc=0, fscale=1)
         return Beta(alpha=a, beta=b)
 
     def set_via_moments(self, mean: float, variance: float):
@@ -111,10 +172,10 @@ class Beta(_Distribution):
         self.alpha = phi * lam
         self.beta = (1 - phi) * lam
 
-    def pdf(self, x: float):
+    def pdf(self, x: float) -> float:
         return stats.beta.pdf(x, self.a, self.b)
 
-    def cdf(self, x: float):
+    def cdf(self, x: float) -> float:
         return stats.beta.cdf(x, self.a, self.b)
 
     def rvs(self, n: int, random_state: Union[int, None] = None):
@@ -237,6 +298,7 @@ class Weibull(_Distribution):
         return stats.weibull_min.cdf(x, c=self.k, loc=0, scale=self.scale)
 
 
+@MODELS.register_module()
 class Exponential(_Distribution):
     def __init__(
         self,

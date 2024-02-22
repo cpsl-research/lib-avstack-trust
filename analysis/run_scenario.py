@@ -11,7 +11,7 @@ from avstack.utils.decorators import FunctionTriggerIterationMonitor
 from bootstrap import load_scenario_from_config
 from PyQt5 import QtCore, QtWidgets
 
-from mate import display
+from . import display
 
 
 def do_run(MainThread):

@@ -1,12 +1,12 @@
-from . import agents, connectives, distribution, pipeline, simulation, trust, wrappers
+from . import connectives, distribution, estimate, fov, measurement, pipeline, state
 
 
 __all__ = [
-    "agents",
     "connectives",
     "distribution",
+    "estimate",
+    "fov",
+    "measurement",
     "pipeline",
-    "simulation",
-    "trust",
-    "wrappers",
+    "state",
 ]

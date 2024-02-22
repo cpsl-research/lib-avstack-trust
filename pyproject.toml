@@ -15,9 +15,7 @@ classifiers = [
 [tool.poetry.dependencies]
 python = "~3.10"
 PyQt5 = "=5.15.2"
-lib-avstack-api = { path = "third_party/lib-avstack-api", develop = true }
-lib-avstack-core = { path = "third_party/lib-avstack-core", develop = true }
-trafficsim = { path = "third_party/traffic-simulator", develop = true }
+lib-avstack-core = { path = "third_party/lib-avstack-core", develop = true, extras = [] }
 
 [tool.poetry.group.test.dependencies]
 pytest = "^7"
@@ -28,6 +26,10 @@ mypy = "^0"
 isort = "^5.11"
 flake8 = "^5.0"
 autoflake = "^1"
+
+
+[tool.poetry.group.dev.dependencies]
+ipykernel = "^6.28.0"
 
 [tool.pytest.ini_options]
 minversion = "6.0"
