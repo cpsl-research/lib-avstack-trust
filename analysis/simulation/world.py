@@ -9,7 +9,7 @@ class World:
         self._agent_map = {}
         self.tracks = {}
         self.frame = 0
-        self.t = 0
+        self.timestamp = 0
         self.dt = dt
         self.dimensions = dimensions
         self.extent = extent
@@ -25,7 +25,7 @@ class World:
 
     def tick(self):
         self.frame += 1
-        self.t += self.dt
+        self.timestamp += self.dt
         for obj in self.objects:
             obj.tick(self.dt)
 
@@ -53,11 +53,15 @@ class World:
         """Receive all tracks from an agent"""
         self.tracks[agent_ID] = (timestamp, tracks)
 
-    def pull_tracks(self, timestamp, with_timestamp=False):
+    def pull_tracks(self, timestamp, with_timestamp=False, target_reference=None):
         """Give all tracks to an agent if in range"""
         assert not with_timestamp
         sends = {
-            ID: (self.tracks[ID][1][0] if len(self.tracks[ID][1]) > 0 else [])
+            ID: (self.tracks[ID][1] if len(self.tracks[ID][1]) > 0 else [])
             for ID in self.tracks
         }  # HACK for only 1 tracker per agent
+        if target_reference:
+            for ID, send in sends.items():
+                if len(send) > 0:
+                    send.apply("change_reference", target_reference, inplace=False)
         return sends

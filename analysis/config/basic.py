@@ -1,3 +1,6 @@
+from numpy import pi
+
+
 _n_objects = 20
 _n_agents = 10
 
@@ -24,13 +27,39 @@ agents = [
         "spawn": {"type": "RandomPoseTwist"},
         "motion": {"type": "ConstantSpeedConstantTurn"},
         "communication": {"type": "Omnidirectional"},
-        "sensing": [{"type": "PositionSensor"}],
+        "sensing": [
+            {
+                "type": "PositionSensor",
+                "name": "sensor",
+                "fov": {
+                    "type": "Wedge",
+                    "radius": 20,
+                    "angle_start": -pi / 4,
+                    "angle_stop": pi / 4,
+                },
+            }
+        ],
         "pipeline": {
-            "type": "SerialPipeline",
-            "modules": [{"type": "BasicXyzTracker"}],
+            "type": "MappedPipeline",
+            "modules": {"tracker": {"type": "BasicXyzTracker"}},
+            "mapping": {"tracker": ["sensor"]},
         },
     }
     for _ in range(_n_agents)
 ]
 
-commandcenter = {"type": "BasicCommandCenter", "pipeline": {"type": "NoTrustPipeline"}}
+commandcenter = {
+    "type": "BasicCommandCenter",
+    "pipeline": {
+        "type": "MappedPipeline",
+        "modules": {
+            "clusterer": {"type": "SampledAssignmentClusterer"},
+            "tracker": {
+                "type": "GroupTracker",
+                "fusion": {"type": "CovarianceIntersectionFusion"},
+                "tracker": {"type": "BasicXyzTracker"},
+            },
+        },
+        "mapping": {"clusterer": ["agents"], "tracker": ["clusterer"]},
+    },
+}

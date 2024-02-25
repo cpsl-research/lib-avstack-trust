@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import cProfile
 import logging
 import random
 import sys
@@ -50,7 +51,7 @@ def do_run(MainThread):
     parser.add_argument("config_file", type=str, help="Path to scenario config file")
     parser.add_argument("--display", action="store_true")
     parser.add_argument("--debug", action="store_true")
-    parser.add_argument("--sleeps", default=0.01)
+    parser.add_argument("--sleeps", default=0.0001)
     args = parser.parse_args()
 
     cfg = Config.fromfile(args.config_file)
@@ -94,13 +95,15 @@ def _run_inner(thread, world, objects, agents, commandcenter, sleeps=0.01):
         agent.move()
 
     # -- run the central processing
-    tracks_out, cluster_trusts, agent_trusts = commandcenter.tick()
+    output = commandcenter.tick()
 
     # -- update displays
     if thread is not None:
-        thread.truth_signal.emit(world.frame, world.t, world.objects, world.agents)
-        thread.estim_signal.emit(world.frame, world.t, tracks_out, world.agents)
-        thread.trust_signal.emit(world.frame, world.t, cluster_trusts, agent_trusts)
+        thread.truth_signal.emit(
+            world.frame, world.timestamp, world.objects, world.agents
+        )
+        # thread.estim_signal.emit(world.frame, world.timestamp, tracks_out, world.agents)
+        # thread.trust_signal.emit(world.frame, world.timestamp, cluster_trusts, agent_trusts)
     time.sleep(sleeps)
 
 
@@ -144,4 +147,8 @@ class MainThread(QtCore.QThread):
 
 
 if __name__ == "__main__":
+    pr = cProfile.Profile()
+    pr.enable()
     do_run(MainThread)
+    pr.disable()
+    pr.dump_stats("last_run.prof")

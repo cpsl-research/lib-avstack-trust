@@ -2,12 +2,10 @@ import itertools
 from typing import Dict, FrozenSet, Union
 
 import numpy as np
-from avstack.sensors import LidarData
+from avstack.config import GEOMETRY
 
 
-def get_disjoint_fov_subsets(
-    fovs: Dict[int, "FieldOfView"]
-) -> Dict[FrozenSet[int], "FieldOfView"]:
+def get_disjoint_fov_subsets(fovs: Dict[int, "Shape"]) -> Dict[FrozenSet[int], "Shape"]:
     """compute all disjoint FOV subsets from all agents
 
     A disjoint subsets are subsets that have no overlap with each other.
@@ -79,6 +77,7 @@ class Shape:
     pass
 
 
+@GEOMETRY.register_module()
 class Wedge(Shape):
     def __init__(self, radius: float, angle_start: float, angle_stop: float) -> None:
         """Define a wedge as a part of a circle
@@ -92,22 +91,34 @@ class Wedge(Shape):
         self.radius = radius
         self.angle_range = [angle_start, angle_stop]
 
+    @property
+    def angle_start(self):
+        return self.angle_range[0]
+
+    @property
+    def angle_stop(self):
+        return self.angle_range[1]
+
     def check_point(self, point: np.ndarray):
-        """TODO: vectorize"""
-        rng = np.linalg.norm(point)
-        if rng <= self.radius:
-            az = np.arctan2(point[1], point[0])  # between [-pi, pi]
-            if self.angle_range[0] <= az <= self.angle_range[1]:
-                return True
-        return False
+        if len(point.shape) == 1:
+            point = point[:, None]
+        flag_rng = np.linalg.norm(point, axis=0) <= self.radius
+        az = np.arctan2(point[1, :], point[0, :])
+        flag_az_1 = self.angle_range[0] <= az
+        flag_az_2 = az <= self.angle_range[1]
+        return flag_rng & flag_az_1 & flag_az_2
 
 
+@GEOMETRY.register_module()
 class Circle(Shape):
-    def __init__(self, radius: float, center: np.ndarray) -> None:
+    def __init__(self, radius: float, center: np.ndarray = np.zeros((2,))) -> None:
         self.radius = radius
         self.center = center
 
-    def intersection(self, other: "FieldOfView") -> Union["FieldOfView", None]:
+    def check_point(self, point: np.ndarray):
+        return np.linalg.norm(point - self.center, axis=0) < self.radius
+
+    def intersection(self, other: "Shape") -> Union["Shape", None]:
         if isinstance(other, Circle):
             d = np.linalg.norm(self.center - other.center)
             if (d + self.radius) < other.radius:
@@ -124,16 +135,17 @@ class Circle(Shape):
             raise NotImplementedError
         return overlap
 
-    def difference(self, other: "FieldOfView") -> Union["FieldOfView", None]:
+    def difference(self, other: "Shape") -> Union["Shape", None]:
         raise NotImplementedError
 
 
+@GEOMETRY.register_module()
 class Vesica(Shape):
     def __init__(self, circles):
         """Shape formed by intersection of circles"""
         self.circles = circles
 
-    def intersection(self, other: "FieldOfView") -> Union["FieldOfView", None]:
+    def intersection(self, other: "Shape") -> Union["Shape", None]:
         if isinstance(other, Circle):
             for circle in self.circles:
                 if np.linalg.norm(circle.center - other.center) >= max(
@@ -149,34 +161,34 @@ class Vesica(Shape):
             raise NotImplementedError
         return overlap
 
-    def difference(self, other: "FieldOfView") -> Union["FieldOfView", None]:
+    def difference(self, other: "Shape") -> Union["Shape", None]:
         raise NotImplementedError
 
 
-class FieldOfView:
-    def check_point(self, point: np.ndarray):
-        raise NotImplementedError
+# class FieldOfView:
+#     def check_point(self, point: np.ndarray):
+#         raise NotImplementedError
 
-    def intersection(self, other: "FieldOfView") -> Union["FieldOfView", None]:
-        raise NotImplementedError
+#     def intersection(self, other: "FieldOfView") -> Union["FieldOfView", None]:
+#         raise NotImplementedError
 
-    def difference(self, other: "FieldOfView") -> Union["FieldOfView", None]:
-        raise NotImplementedError
-
-
-class ParametricFieldOfView(FieldOfView):
-    def __init__(self) -> None:
-        """Uses a particular shape to form a field of view"""
-        super().__init__()
-
-    def check_point(self, point: np.ndarray):
-        return any([shape.check_point(point) for shape in self.shapes])
+#     def difference(self, other: "FieldOfView") -> Union["FieldOfView", None]:
+#         raise NotImplementedError
 
 
-def fov_from_radar(range_doppler):
-    raise NotImplementedError
+# class ParametricFieldOfView(FieldOfView):
+#     def __init__(self) -> None:
+#         """Uses a particular shape to form a field of view"""
+#         super().__init__()
+
+#     def check_point(self, point: np.ndarray):
+#         return any([shape.check_point(point) for shape in self.shapes])
 
 
-def fov_from_lidar(pc: LidarData):
-    """Use LiDAR data to estimate the field of view"""
-    raise NotImplementedError
+# def fov_from_radar(range_doppler):
+#     raise NotImplementedError
+
+
+# def fov_from_lidar(pc: LidarData):
+#     """Use LiDAR data to estimate the field of view"""
+#     raise NotImplementedError

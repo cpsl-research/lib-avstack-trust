@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any, Dict, List
 
 if TYPE_CHECKING:
     from mate.connectives import _DeMorganTriple, StandardFuzzy
+    from mate.fov import Shape
 
 import numpy as np
 from avstack.config import MODELS, ConfigDict
@@ -13,7 +14,6 @@ from avstack.geometry.datastructs import Pose
 from avstack.modules.tracking.tracks import _TrackBase
 
 from mate import distribution
-from mate.fov import FieldOfView
 from mate.state import Agent
 
 
@@ -147,7 +147,7 @@ class AgentScorer(PseudoMeasurementBase):
         tracks: Dict[int, List[_TrackBase]],
         agents: Dict[int, Agent],
         poses: Dict[int, Pose],
-        fovs: Dict[int, FieldOfView],
+        fovs: Dict[int, "Shape"],
         *args: Any,
         **kwds: Any
     ) -> Any:
@@ -284,7 +284,7 @@ class AgentFreeSpaceScorer(PseudoMeasurementBase):
         self,
         tracks: Dict[int, List[_TrackBase]],
         poses: Dict[int, Pose],
-        fovs: Dict[int, FieldOfView],
+        fovs: Dict[int, "Shape"],
         *args: Any,
         **kwds: Any
     ) -> Any:

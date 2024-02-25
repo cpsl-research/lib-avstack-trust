@@ -66,7 +66,7 @@ class _Agent:
         self.trusted = trusted
         self._trust = 1.0 if trusted else 0.5
         self.world = world
-        self.t = self.world.t
+        self.timestamp = self.world.timestamp
         self.pose, self.twist, _ = MODELS.build(spawn)(world)
 
         # set self as a reference
@@ -85,7 +85,8 @@ class _Agent:
             )
             for sensor in sensing
         ]
-        self.sensing = {sensor.ID: sensor for sensor in sensors}
+        self.sensing = {sensor.name: sensor for sensor in sensors}
+        assert len(self.sensing) == len(sensors)
 
         # initialize pipeline
         motion.extent = world.extent
@@ -121,24 +122,25 @@ class _Agent:
         return self.comms.in_range(self, other)
 
     def tick(self):
-        self.t = self.world.t
+        self.timestamp = self.world.timestamp
         self.process()
 
     def process(self):
         # -- sensing
         frame = self.world.frame
-        timestamp = self.world.t
+        timestamp = self.world.timestamp
         s_out = {
             k: v(frame, timestamp, self.world.objects) for k, v in self.sensing.items()
         }
         tracks_out = self.pipeline(
-            sensing=s_out, platform=self._reference, frame=frame, timestamp=timestamp
+            data=s_out,
+            platform=self._reference,
         )
         self.send(tracks=tracks_out)
 
     def send(self, tracks):
         """Send tracks to out. Receive from world perspective"""
-        self.world.push_tracks(self.t, self.ID, tracks)
+        self.world.push_tracks(self.timestamp, self.ID, tracks)
 
     def receive(self):
         """Send information out into the world, receive world information"""
@@ -162,24 +164,27 @@ class _CommandCenter:
 
     def __init__(self, pipeline, world) -> None:
         self.world = world
-        self.t = self.world.t
+        self.timestamp = self.world.timestamp
         self.frame = self.world.frame
         self.platform = GlobalOrigin3D
         self.pipeline = PIPELINE.build(pipeline)
 
     def tick(self):
         self.frame = self.world.frame
-        self.t = self.world.t
+        self.timestamp = self.world.timestamp
         agents = self.world.agents
-        tracks_in = self.world.pull_tracks(timestamp=self.t, with_timestamp=False)
-        tracks_out, cluster_trusts, agent_trusts = self.pipeline(
-            agents=agents,
-            tracks_in=tracks_in,
+        tracks_in = self.world.pull_tracks(
+            timestamp=self.timestamp,
+            with_timestamp=False,
+            target_reference=GlobalOrigin3D,
+        )
+        output = self.pipeline(
+            data={"agents": tracks_in},
             platform=self.platform,
             frame=self.frame,
-            timestamp=self.t,
+            timestamp=self.timestamp,
         )
-        return tracks_out, cluster_trusts, agent_trusts
+        return output
 
 
 @AGENTS.register_module()

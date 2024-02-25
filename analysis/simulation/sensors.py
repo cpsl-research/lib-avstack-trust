@@ -2,18 +2,27 @@ import itertools
 from typing import Tuple
 
 import numpy as np
-from avstack.config import MODELS
+from avstack.config import GEOMETRY, MODELS, ConfigDict
 from avstack.datastructs import DataContainer
-from avstack.geometry import GlobalOrigin3D, Position, ReferenceFrame
-from avstack.geometry.transformations import cartesian_to_spherical
-from avstack.modules.perception.detections import RazDetection
+from avstack.geometry import Position, ReferenceFrame
+from avstack.modules.perception.detections import CentroidDetection
 
 
 class SensorModel:
     _ids = itertools.count()
 
     def __init__(
-        self, x, q, noise, reference, extent, fov, ID=None, Pd=0.95, Dfa=1e-6
+        self,
+        x,
+        q,
+        noise,
+        reference,
+        extent,
+        fov,
+        ID=None,
+        Pd=0.95,
+        Dfa=1e-6,
+        name="sensor",
     ) -> None:
         """Base class for an observation model
 
@@ -23,43 +32,45 @@ class SensorModel:
         Pd     - probability of detection of a true object
         Dfa    - density of false alarms in 1/m^2
         """
+        self.name = name
         self.ID = ID if ID else next(SensorModel._ids)
         self.x = x
         self.q = q
         self.Pd = Pd
         self.Dfa = Dfa
         self.extent = extent
-        self.fov = fov
+        self.fov = GEOMETRY.build(fov)
+        self._fov_area_uniform = self.fov.radius**2
         self.noise = noise
-        self.area = (extent[0][1] - extent[0][0]) * (extent[1][1] - extent[1][0])
         self._reference = ReferenceFrame(x=x, q=q, reference=reference)
 
     def as_reference(self):
         return self._reference
 
     def __call__(self, frame, timestamp, objects):
-        # -- add false positives
-        n_fp = np.random.poisson(self.Dfa * self.area)
-        x = np.random.uniform(low=self.extent[0][0], high=self.extent[0][1], size=n_fp)
-        y = np.random.uniform(low=self.extent[0][0], high=self.extent[0][1], size=n_fp)
+        # -- add false positives via rejection sampling
+        n_fp = np.random.poisson(self.Dfa * self._fov_area_uniform)
+        x = np.random.uniform(low=-self.fov.radius, high=self.fov.radius, size=n_fp)
+        y = np.random.uniform(low=-self.fov.radius, high=self.fov.radius, size=n_fp)
         z = np.zeros((n_fp,))
-        objs_fp = [Position(v, GlobalOrigin3D) for v in np.column_stack((x, y, z))]
+        vs = np.column_stack((x, y, z))
+        if len(vs) > 0:
+            fov_test_fps = self.fov.check_point(vs.T)
+            objs_fp = [Position(v, self._reference) for v in vs[fov_test_fps, :]]
+        else:
+            objs_fp = []
+
+        # -- check objects in fov
+        obj_xs = np.array([obj.position.x for obj in objects])
+        fov_test_objs = self.fov.check_point(obj_xs.T)
+        obj_in_view = [obj for obj, in_fov in zip(objects, fov_test_objs) if in_fov]
 
         # -- make measurements
         detections = []
-        for i, objs in enumerate((objects, objs_fp)):
+        for i, objs in enumerate((obj_in_view, objs_fp)):
             for obj in objs:
-                # -- check in fov
                 if not isinstance(obj, Position):
                     obj = obj.position
-                obj = obj.change_reference(self.as_reference(), inplace=False)
-                razel = cartesian_to_spherical(obj.x)
-                in_range = razel[0] <= self.fov[0]
-                razel[1] = razel[1] % (2 * np.pi)
-                in_azimuth = min(razel[1], 2 * np.pi - razel[1]) <= self.fov[1]
-                if not (in_range and in_azimuth):
-                    continue
-                # -- make measurement
                 if (i == 0) and (np.random.rand() > self.Pd):
                     continue  # sometimes false negative
                 detections.append(self.observe(self, obj))
@@ -78,12 +89,15 @@ class PositionSensor(SensorModel):
         x: np.ndarray = np.zeros((3,)),
         q: np.quaternion = np.quaternion(1),
         noise: np.ndarray = np.zeros((3,)),
-        fov: float = 2 * np.pi,
+        fov: ConfigDict = {"type": "Circle", "radius": 20},
         ID=None,
         Pd=0.95,
         Dfa=1e-6,
+        name: str = "sensor",
     ) -> None:
-        super().__init__(x, q, noise, reference, extent, fov, ID=ID, Pd=Pd, Dfa=Dfa)
+        super().__init__(
+            x, q, noise, reference, extent, fov, ID=ID, Pd=Pd, Dfa=Dfa, name=name
+        )
 
     def observe(self, sensor, obj, noisy=True):
         """Make local observation and add Gaussian noise"""
@@ -91,10 +105,9 @@ class PositionSensor(SensorModel):
             obj = obj.position
         obj = obj.change_reference(self.as_reference(), inplace=False)
         xyz = obj.x + self.noise * np.random.randn(3) if noisy else obj.x
-        razel = cartesian_to_spherical(xyz)
-        detection = RazDetection(
+        detection = CentroidDetection(
             source_identifier=sensor.ID,
-            raz=razel[:2],
+            centroid=xyz,
             reference=self.as_reference(),
         )
         return detection
