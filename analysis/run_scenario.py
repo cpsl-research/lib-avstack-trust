@@ -8,6 +8,7 @@ import sys
 import time
 
 import avstack  # noqa # pylint: disable=unused-import
+import numpy as np
 from avstack.config import AGENTS, MODELS, Config
 from avstack.utils.decorators import FunctionTriggerIterationMonitor
 from PyQt5 import QtCore, QtWidgets
@@ -49,10 +50,13 @@ def load_scenario_from_config(cfg, world=None):
 def do_run(MainThread):
     parser = argparse.ArgumentParser()
     parser.add_argument("config_file", type=str, help="Path to scenario config file")
+    parser.add_argument("--seed", default=None, type=int)
     parser.add_argument("--display", action="store_true")
     parser.add_argument("--debug", action="store_true")
     parser.add_argument("--sleeps", default=0.0001)
     args = parser.parse_args()
+
+    np.random.seed(args.seed)
 
     cfg = Config.fromfile(args.config_file)
     world = MODELS.build(cfg.world)
@@ -95,14 +99,22 @@ def _run_inner(thread, world, objects, agents, commandcenter, sleeps=0.01):
         agent.move()
 
     # -- run the central processing
-    output = commandcenter.tick()
+    cc_output = commandcenter.tick()
 
     # -- update displays
     if thread is not None:
         thread.truth_signal.emit(
-            world.frame, world.timestamp, world.objects, world.agents
+            world.frame, world.timestamp, {"truth": world.objects}, world.agents
         )
-        # thread.estim_signal.emit(world.frame, world.timestamp, tracks_out, world.agents)
+        thread.agent_signal.emit(
+            world.frame,
+            world.timestamp,
+            world.pull_tracks(timestamp=None),
+            world.agents,
+        )
+        thread.command_signal.emit(
+            world.frame, world.timestamp, {"cc": cc_output}, world.agents
+        )
         # thread.trust_signal.emit(world.frame, world.timestamp, cluster_trusts, agent_trusts)
     time.sleep(sleeps)
 
@@ -110,7 +122,8 @@ def _run_inner(thread, world, objects, agents, commandcenter, sleeps=0.01):
 class MainThread(QtCore.QThread):
     truth_signal = QtCore.pyqtSignal(int, float, object, object)
     detec_signal = QtCore.pyqtSignal(int, float, object, object)
-    estim_signal = QtCore.pyqtSignal(int, float, object, object)
+    agent_signal = QtCore.pyqtSignal(int, float, object, object)
+    command_signal = QtCore.pyqtSignal(int, float, object, object)
     trust_signal = QtCore.pyqtSignal(int, float, object, object)
 
     def __init__(self, cfg, sleeps=0.01, world=None, *args, **kwargs) -> None:

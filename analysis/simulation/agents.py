@@ -1,6 +1,7 @@
 import itertools
 from typing import List
 
+import numpy as np
 from avstack.config import AGENTS, MODELS, PIPELINE, ConfigDict
 from avstack.geometry import GlobalOrigin3D, ReferenceFrame
 
@@ -67,15 +68,14 @@ class _Agent:
         self._trust = 1.0 if trusted else 0.5
         self.world = world
         self.timestamp = self.world.timestamp
-        self.pose, self.twist, _ = MODELS.build(spawn)(world)
-
-        # set self as a reference
+        # initialize reference
         self._reference = ReferenceFrame(
-            x=self.position.x,
-            v=self.velocity.x,
-            q=self.attitude.q,
-            reference=self.position.reference,
+            x=np.zeros((3,)),
+            v=np.zeros((3,)),
+            q=np.quaternion(1),
+            reference=GlobalOrigin3D,
         )
+        self.pose, self.twist, _ = MODELS.build(spawn)(world)
 
         # initialize sensor
         sensors = [
@@ -110,20 +110,36 @@ class _Agent:
     def trust(self):
         return self._trust
 
+    @property
+    def pose(self):
+        return self._pose
+
+    @pose.setter
+    def pose(self, pose):
+        self._pose = pose
+        self._reference.x = pose.position.x
+        self._reference.q = pose.attitude.q
+
+    @property
+    def twist(self):
+        return self._twist
+
+    @twist.setter
+    def twist(self, twist):
+        self._twist = twist
+        self._reference.v = twist.linear.x
+
     def as_reference(self):
         return self._reference
-
-    def update_reference(self, x, v, q):
-        self._reference.x = x
-        self._reference.v = v
-        self._reference.q = q
 
     def in_range(self, other):
         return self.comms.in_range(self, other)
 
     def tick(self):
+        dt = self.world.timestamp - self.timestamp
         self.timestamp = self.world.timestamp
         self.process()
+        self.pose, self.twist = self.motion.tick(self.pose, self.twist, dt)
 
     def process(self):
         # -- sensing
@@ -144,7 +160,7 @@ class _Agent:
 
     def receive(self):
         """Send information out into the world, receive world information"""
-        tracks = self.world.pull_tracks(self.t, self.ID, with_timestamp=False)
+        tracks = self.world.pull_tracks(self.timestamp, self.ID, with_timestamp=False)
         return tracks
 
     def plan(self):

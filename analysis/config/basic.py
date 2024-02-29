@@ -2,7 +2,7 @@ from numpy import pi
 
 
 _n_objects = 20
-_n_agents = 10
+_n_agents = 6
 
 world = {
     "type": "World",
@@ -25,7 +25,7 @@ agents = [
         "type": "BasicAgent",
         "trusted": False,
         "spawn": {"type": "RandomPoseTwist"},
-        "motion": {"type": "ConstantSpeedConstantTurn"},
+        "motion": {"type": "Stationary"},
         "communication": {"type": "Omnidirectional"},
         "sensing": [
             {
@@ -34,8 +34,8 @@ agents = [
                 "fov": {
                     "type": "Wedge",
                     "radius": 20,
-                    "angle_start": -pi / 4,
-                    "angle_stop": pi / 4,
+                    "angle_start": -pi,
+                    "angle_stop": pi,
                 },
             }
         ],
@@ -53,7 +53,7 @@ commandcenter = {
     "pipeline": {
         "type": "MappedPipeline",
         "modules": {
-            "clusterer": {"type": "SampledAssignmentClusterer"},
+            "clusterer": {"type": "SampledAssignmentClusterer", "assign_radius": 4.0},
             "tracker": {
                 "type": "GroupTracker",
                 "fusion": {"type": "CovarianceIntersectionFusion"},

@@ -15,7 +15,7 @@ import numpy as np
 
 matplotlib.use("Qt5Agg")
 from avstack.datastructs import PriorityQueue
-from avstack.geometry import GlobalOrigin3D
+from avstack.geometry import GlobalOrigin3D, transform_orientation
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 from matplotlib.lines import Line2D
@@ -26,8 +26,8 @@ from PyQt5 import QtCore, QtWidgets
 class MplCanvas(FigureCanvasQTAgg):
     def __init__(self, parent=None, width=16, height=8, dpi=100):
         fig = Figure(figsize=(width, height), dpi=dpi)
-        self.axes = fig.subplots(1, 4, width_ratios=[4, 4, 1, 1])
-        for ax in self.axes[:2]:
+        self.axes = fig.subplots(1, 4, width_ratios=[4, 4, 4, 1])
+        for ax in self.axes[:3]:
             ax.set_aspect("equal")
         super(MplCanvas, self).__init__(fig)
 
@@ -37,8 +37,9 @@ class MainWindow(QtWidgets.QMainWindow):
         super(MainWindow, self).__init__(*args, **kwargs)
         self._thread = thread
         self._thread.truth_signal.connect(self.update_truth_data)
-        self._thread.estim_signal.connect(self.update_estim_data)
+        self._thread.agent_signal.connect(self.update_agent_data)
         self._thread.detec_signal.connect(self.update_detect_data)
+        self._thread.command_signal.connect(self.update_command_data)
         self._thread.trust_signal.connect(self.update_trust_data)
 
         self.canvas = MplCanvas(self, width=20, height=8, dpi=100)
@@ -59,10 +60,22 @@ class MainWindow(QtWidgets.QMainWindow):
             "pts": [],
             "wedges": [],
         }
-        self.estim = {
-            "supertitle": "Estimated",
+        self.agents = {
+            "supertitle": "Agents",
             "show_fov": True,
             "show_detects": True,
+            "initialized": False,
+            "frame": 0,
+            "t": 0,
+            "objects": {},
+            "agents": {},
+            "pts": [],
+            "wedges": [],
+        }
+        self.commandcenter = {
+            "supertitle": "Command Center",
+            "show_fov": True,
+            "show_detects": False,
             "initialized": False,
             "frame": 0,
             "t": 0,
@@ -141,17 +154,18 @@ class MainWindow(QtWidgets.QMainWindow):
         )
 
         # -- plot objects
-        for obj in datastruct["objects"]:
-            obj.change_reference(GlobalOrigin3D, inplace=True)
-            datastruct["pts"].extend(
-                axis.plot(obj.position.x[0], obj.position.x[1], obj_color + "o")
-            )
+        for group, objs in datastruct["objects"].items():
+            for obj in objs:
+                obj.change_reference(GlobalOrigin3D, inplace=True)
+                datastruct["pts"].extend(
+                    axis.plot(obj.position.x[0], obj.position.x[1], obj_color + ".")
+                )
 
         # -- plot agents
         for agent in datastruct["agents"]:
             color = root_color if agent.trusted else rad_color
             datastruct["pts"].extend(
-                axis.plot(agent.position.x[0], agent.position.x[1], color + "o")
+                axis.plot(agent.position.x[0], agent.position.x[1], color + "*")
             )
             # -- fov wedge
             if datastruct["show_fov"]:
@@ -161,11 +175,12 @@ class MainWindow(QtWidgets.QMainWindow):
                 s_ref = sens.as_reference()
                 s_global = s_ref.integrate(start_at=GlobalOrigin3D)
                 center = [s_global.x[0], s_global.x[1]]
+                angle_init = transform_orientation(s_global.q, "quat", "euler")[2]
                 wedge = mWedge(
                     center,
                     sens.fov.radius,
-                    sens.fov.angle_start * 180 / np.pi,
-                    sens.fov.angle_stop * 180 / np.pi,
+                    (angle_init + sens.fov.angle_start) * 180 / np.pi,
+                    (angle_init + sens.fov.angle_stop) * 180 / np.pi,
                     alpha=0.3,
                     color=color,
                 )
@@ -265,11 +280,14 @@ class MainWindow(QtWidgets.QMainWindow):
     def update_truth_data(self, frame, t, objects, agents):
         self._update_data(self.truth, frame, t, objects, agents)
 
-    def update_estim_data(self, frame, t, objects, agents):
-        self._update_data(self.estim, frame, t, objects, agents)
+    def update_agent_data(self, frame, t, objects, agents):
+        self._update_data(self.agents, frame, t, objects, agents)
 
     def update_detect_data(self, frame, t, obj, detections):
         self._update_detections(frame, t, obj, detections)
+
+    def update_command_data(self, frame, t, objects, agents):
+        self._update_data(self.commandcenter, frame, t, objects, agents)
 
     def update_trust_data(self, frame, t, cluster_trusts, agent_trusts):
         self._update_data(self.trusts, frame, t, cluster_trusts, agent_trusts)
@@ -286,22 +304,34 @@ class MainWindow(QtWidgets.QMainWindow):
             rad_color,
             x_frame_buffer=0,
         )
-        # -- plot of the estimated/detected
+        # -- plot of the estimated/detected from agents
         self._update_scenario_plot(
             self.extent,
             self.canvas.axes[1],
-            self.estim,
+            self.agents,
             self.detect,
             obj_color,
             root_color,
             rad_color,
             x_frame_buffer=self.detect_frame_buffer,
         )
-        # -- plot of the trusts
-        self._update_trust_plot(
+        # -- plot of the estimated/detected from cc
+        self._update_scenario_plot(
+            self.extent,
             self.canvas.axes[2],
-            self.canvas.axes[3],
-            self.trusts,
+            self.commandcenter,
+            {},
+            obj_color,
+            root_color,
+            rad_color,
+            x_frame_buffer=0,
         )
+
+        # -- plot of the trusts
+        # self._update_trust_plot(
+        #     self.canvas.axes[2],
+        #     self.canvas.axes[3],
+        #     self.trusts,
+        # )
 
         self.canvas.draw()

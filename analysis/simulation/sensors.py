@@ -48,7 +48,7 @@ class SensorModel:
         return self._reference
 
     def __call__(self, frame, timestamp, objects):
-        # -- add false positives via rejection sampling
+        # -- add false positives via rejection sampling on a rectangle
         n_fp = np.random.poisson(self.Dfa * self._fov_area_uniform)
         x = np.random.uniform(low=-self.fov.radius, high=self.fov.radius, size=n_fp)
         y = np.random.uniform(low=-self.fov.radius, high=self.fov.radius, size=n_fp)
@@ -61,7 +61,12 @@ class SensorModel:
             objs_fp = []
 
         # -- check objects in fov
-        obj_xs = np.array([obj.position.x for obj in objects])
+        obj_xs = np.array(
+            [
+                (obj.position.change_reference(self._reference, inplace=False)).x
+                for obj in objects
+            ]
+        )
         fov_test_objs = self.fov.check_point(obj_xs.T)
         obj_in_view = [obj for obj, in_fov in zip(objects, fov_test_objs) if in_fov]
 
