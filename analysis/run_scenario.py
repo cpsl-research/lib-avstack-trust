@@ -109,7 +109,7 @@ def _run_inner(thread, world, objects, agents, commandcenter, sleeps=0.01):
         thread.agent_signal.emit(
             world.frame,
             world.timestamp,
-            world.pull_tracks(timestamp=None),
+            world.pull_agent_data(timestamp=None),
             world.agents,
         )
         thread.command_signal.emit(

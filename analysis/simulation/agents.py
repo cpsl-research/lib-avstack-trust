@@ -156,11 +156,13 @@ class _Agent:
 
     def send(self, tracks):
         """Send tracks to out. Receive from world perspective"""
-        self.world.push_tracks(self.timestamp, self.ID, tracks)
+        self.world.push_agent_data(self.timestamp, self.ID, tracks)
 
     def receive(self):
         """Send information out into the world, receive world information"""
-        tracks = self.world.pull_tracks(self.timestamp, self.ID, with_timestamp=False)
+        tracks = self.world.pull_agent_data(
+            self.timestamp, self.ID, with_timestamp=False
+        )
         return tracks
 
     def plan(self):
@@ -188,17 +190,20 @@ class _CommandCenter:
     def tick(self):
         self.frame = self.world.frame
         self.timestamp = self.world.timestamp
-        agents = self.world.agents
-        tracks_in = self.world.pull_tracks(
+        fovs = {
+            agent.ID: list(agent.sensing.values())[0].fov for agent in self.world.agents
+        }
+        platforms = {
+            agent.ID: list(agent.sensing.values())[0]._reference
+            for agent in self.world.agents
+        }
+        agent_data = self.world.pull_agent_data(
             timestamp=self.timestamp,
             with_timestamp=False,
             target_reference=GlobalOrigin3D,
         )
         output = self.pipeline(
-            data={"agents": tracks_in},
-            platform=self.platform,
-            frame=self.frame,
-            timestamp=self.timestamp,
+            data={"agents": agent_data, "fovs": fovs, "platforms": platforms},
         )
         return output
 
