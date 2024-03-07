@@ -6,6 +6,8 @@ if TYPE_CHECKING:
     from scipy.stats._result_classes import BinomTestResult
 
 import numpy as np
+import pymc as pm
+
 from avstack.config import MODELS, ConfigDict
 from avstack.datastructs import PriorityQueue
 from avstack.modules.estimation import kalman
@@ -333,6 +335,42 @@ class GaussianCopulaTrustEstimator(_TrustEstimator):
 #############################################################
 # FLOAT IMPLEMENTATIONS
 #############################################################
+
+@MODELS.register_module()
+class VariationalBayesianEstimator(_TrustEstimator):
+    multi = False
+
+    def __init__(
+        self,
+        t0: float,
+        time_window: Union[int, None] = None,
+        verbose: bool = False,
+    ) -> None:
+        super().__init__(t0=t0, verbose=verbose)
+
+        # defines a hierarchical bayesian model and uses VI to solve for posterior
+        self.trust_buffer = PriorityQueue(max_size=None, max_heap=False)
+
+    def _propagate(self, dt: float) -> None:
+        pass
+
+    def _update(self, timestamp: float, trust: bool, *args, **kwargs):
+        if self.time_window:
+            self.trust_buffer.pop_all_below(priority_max=timestamp - self.time_window)
+        self.trust_buffer.push(priority=timestamp, item=trust)
+
+    def fit(self):
+        with pm.Model() as model:
+            # set up the pymc model
+            phi = pm.Uniform("phi", lower=0.0, upper=1.0) 
+            lam = pm.Gamma("lambda", alpha=1.0, beta=0.5)
+            obs = [t.trust for t in self.trust_buffer.elements()]
+            trust = pm.Beta("trust", mu=phi, nu=lam, observed=obs)
+            
+            # fit with variational inference
+            approx = pm.fit()
+        return approx
+        
 
 
 @MODELS.register_module()
