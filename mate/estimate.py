@@ -7,7 +7,6 @@ if TYPE_CHECKING:
 
 import numpy as np
 import pymc as pm
-
 from avstack.config import MODELS, ConfigDict
 from avstack.datastructs import PriorityQueue
 from avstack.modules.estimation import kalman
@@ -336,6 +335,7 @@ class GaussianCopulaTrustEstimator(_TrustEstimator):
 # FLOAT IMPLEMENTATIONS
 #############################################################
 
+
 @MODELS.register_module()
 class VariationalBayesianEstimator(_TrustEstimator):
     multi = False
@@ -362,15 +362,14 @@ class VariationalBayesianEstimator(_TrustEstimator):
     def fit(self):
         with pm.Model() as model:
             # set up the pymc model
-            phi = pm.Uniform("phi", lower=0.0, upper=1.0) 
+            phi = pm.Uniform("phi", lower=0.0, upper=1.0)
             lam = pm.Gamma("lambda", alpha=1.0, beta=0.5)
             obs = [t.trust for t in self.trust_buffer.elements()]
             trust = pm.Beta("trust", mu=phi, nu=lam, observed=obs)
-            
+
             # fit with variational inference
             approx = pm.fit()
         return approx
-        
 
 
 @MODELS.register_module()

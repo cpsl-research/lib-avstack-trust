@@ -5,16 +5,20 @@ from typing import TYPE_CHECKING, Any, Dict, List
 
 
 if TYPE_CHECKING:
-    from mate.connectives import _DeMorganTriple, StandardFuzzy
-    from mate.fov import Shape
+    from mate.connectives import _DeMorganTriple
+    from avstack.geometry.fov import Shape
+    from avstack.modules.tracking.tracks import _TrackBase
+    from avstack.modules.clustering import Cluster
 
 import numpy as np
 from avstack.config import MODELS, ConfigDict
 from avstack.geometry.datastructs import Pose
-from avstack.modules.tracking.tracks import _TrackBase
 
 from mate import distribution
 from mate.state import Agent
+
+
+# from mate.connectives import StandardFuzzy, WeightedAverageFuzzy
 
 
 def softmax(x):
@@ -115,22 +119,78 @@ class UncertainTrustFloat(_UncertainTrust):
 #############################################################
 
 
-class PseudoMeasurementBase:
-    def __init__(self, connective: "StandardFuzzy") -> None:
+@MODELS.register_module()
+class ClusterScorerV1:
+    def __init__(
+        self,
+        connective: ConfigDict = {"type": "WeightedAverageFuzzy"},
+    ) -> None:
+        self.agent_cluster_misses = {}
         self.connective = MODELS.build(connective)
 
-    def norm(self, a, b):
-        return self.connective.norm(a, b)
+    def __call__(
+        self,
+        cluster: "Cluster",
+        agents: Dict[int, Agent],
+        poses: Dict[int, Pose],
+        fovs: Dict[int, "Shape"],
+        prior: "UncertainTrustFloat",
+        Pd: float,
+        *args: Any,
+        **kwds: Any
+    ) -> "UncertainTrustFloat":
+        """Obtain a trust pseudo-measurement for each cluster
 
-    def conorm(self, a, b):
-        return self.connective.conorm(a, b)
+        Inputs:
+        - tracks: a dict mapping agent ID to local tracks
+        - poses: a dict mapping agent ID to poses
+        - fovs: a dict mapping agent ID to field of view models
 
-    def negation(self, a):
-        return self.connective.negation(a)
+        Outputs:
+        - score: an estimate of trust on [0, 1] for each agent
+        - uncertainty: an estimate of noise variance on (0, inf) for each agent
+        """
+        N_exp = 0
+        taus = [prior]
+        for k in fovs:
+            # preallocate
+            if k not in self.agent_cluster_misses:
+                self.agent_cluster_misses[k] = {}
+            if fovs[k].check_point(cluster.centroid().x):
+                # preallocate
+                if cluster.ID not in self.agent_cluster_misses[k]:
+                    self.agent_cluster_misses[k][cluster.ID] = 0
+
+                # process if we saw it
+                N_exp += 1
+                if k in cluster.agent_IDs:
+                    self.agent_cluster_misses[k][cluster.ID] = 0
+                    tk = cluster.get_tracks_by_agent_ID(ID=k)[0].probability
+                    tau = UncertainTrustFloat(
+                        trust=1.0, confidence=tk, prior=prior.prior, ID=cluster.ID
+                    )
+                else:
+                    self.agent_cluster_misses[k][cluster.ID] += 1
+                    cf = 1 - (1 - Pd) ** self.agent_cluster_misses[k][cluster.ID]
+                    tau = UncertainTrustFloat(
+                        trust=0.0, confidence=cf, prior=prior.prior, ID=cluster.ID
+                    )
+
+                # update trust value
+                taus.append(tau)
+
+        # return based on how many
+        if N_exp < 2:
+            return prior
+        else:
+            return taus
+            # return self.connective.norm(
+            #     inputs=np.array([tau.t for tau in taus]), weight=np.array([tau.c for tau in taus])
+            # )
 
 
 @MODELS.register_module()
-class AgentScorer(PseudoMeasurementBase):
+class AgentScorer:
     def __init__(
         self,
         connective: ConfigDict = {"type": "StandardFuzzy"},
@@ -144,7 +204,7 @@ class AgentScorer(PseudoMeasurementBase):
 
     def __call__(
         self,
-        tracks: Dict[int, List[_TrackBase]],
+        tracks: Dict[int, List["_TrackBase"]],
         agents: Dict[int, Agent],
         poses: Dict[int, Pose],
         fovs: Dict[int, "Shape"],
@@ -274,15 +334,15 @@ class AgentScorer(PseudoMeasurementBase):
 
 
 @MODELS.register_module()
-class AgentObjectLocalScorer(PseudoMeasurementBase):
+class AgentObjectLocalScorer:
     pass
 
 
 @MODELS.register_module()
-class AgentFreeSpaceScorer(PseudoMeasurementBase):
+class AgentFreeSpaceScorer:
     def __call__(
         self,
-        tracks: Dict[int, List[_TrackBase]],
+        tracks: Dict[int, List["_TrackBase"]],
         poses: Dict[int, Pose],
         fovs: Dict[int, "Shape"],
         *args: Any,
@@ -303,7 +363,7 @@ class AgentFreeSpaceScorer(PseudoMeasurementBase):
 
 
 @MODELS.register_module()
-class ClusterScorer(PseudoMeasurementBase):
+class ClusterScorer:
     def __init__(self, connective: "_DeMorganTriple") -> None:
         super().__init__(connective=connective)
 

@@ -1,5 +1,5 @@
 import itertools
-from typing import Tuple, TYPE_CHECKING
+from typing import Tuple
 
 import numpy as np
 from avstack.config import GEOMETRY, MODELS, ConfigDict
@@ -20,10 +20,10 @@ class SensorModel:
         extent,
         fov,
         ID=None,
-        Pd: float=0.95,
-        Dfa: float=1e-6,
-        p_p_FP: float=0,
-        p_p_FN: float=0,
+        Pd: float = 0.95,
+        Dfa: float = 1e-6,
+        p_p_FP: float = 0,
+        p_p_FN: float = 0,
         name="sensor",
     ) -> None:
         """Base class for an observation model
@@ -64,13 +64,17 @@ class SensorModel:
         fov_test_objs = self.fov.check_point(obj_xs.T)
         objs_in_view = [obj for obj, in_fov in zip(objects, fov_test_objs) if in_fov]
         IDs = {obj.ID for obj in objs_in_view}
-        
+
         # remove false negatives with persistence
         self._last_fn = {ID for ID in self._last_fn if ID in IDs}
         n_fn_persist = np.random.binomial(n=len(self._last_fn), p=self.p_p_FN)
-        n_fn_new = max(0, np.random.binomial(len(objs_in_view)-n_fn_persist, p=1-self.p_D))
+        n_fn_new = max(
+            0, np.random.binomial(len(objs_in_view) - n_fn_persist, p=1 - self.p_D)
+        )
         fns_persist = np.random.choice(self._last_fn, size=n_fn_persist, replace=False)
-        fns_new = np.random.choice(IDs.difference(fns_persist), size=n_fn_new, replace=False)
+        fns_new = np.random.choice(
+            IDs.difference(fns_persist), size=n_fn_new, replace=False
+        )
         fns = fns_persist + fns_new
         for idx in sorted(np.argwhere(IDs == fns), reverse=True):
             del objs_in_view[idx]
@@ -79,7 +83,9 @@ class SensorModel:
         n_fp_persist = np.random.binomial(n=len(self._last_fp), p=self.p_p_FP)
         n_fp_new = max(0, np.random.poisson(self.lambda_fp(self.fov)) - n_fp_persist)
         fps_persist = np.random.choice(self._last_fp, size=n_fp_persist, replace=False)
-        fps_new = [Position(self.fov.sample_point(), self._reference) for _ in range(n_fp_new)]
+        fps_new = [
+            Position(self.fov.sample_point(), self._reference) for _ in range(n_fp_new)
+        ]
         fps = fps_persist + fps_new
         objs_in_view += fps
         self._last_fp = fps
