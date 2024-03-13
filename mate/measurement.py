@@ -183,10 +183,17 @@ class ClusterScorerV1:
         if N_exp < 2:
             return prior
         else:
-            return taus
-            # return self.connective.norm(
-            #     inputs=np.array([tau.t for tau in taus]), weight=np.array([tau.c for tau in taus])
-            # )
+            def normalize(cs, exp=1):
+                return cs**exp / sum(cs**exp)
+
+            # perform weighted combinations
+            ts = np.asarray([t.t for t in taus])
+            cs = np.asarray([t.c for t in taus])
+            w_norm = normalize(cs)
+            trust = ts @ w_norm
+            confidence = 1 - np.var(ts)
+            return UncertainTrustFloat(trust, confidence, prior=1/2)
+
 
 
 @MODELS.register_module()

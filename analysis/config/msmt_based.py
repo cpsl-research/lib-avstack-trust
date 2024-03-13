@@ -26,8 +26,8 @@ agents = [
         ],
         "pipeline": {
             "type": "MappedPipeline",
-            "modules": {"extractor": lambda x, *args, **kwargs: x},
-            "mapping": {"extractor": ["sensor"]},
+            "modules": {"tracker": {"type": "BasicXyzTracker"}},
+            "mapping": {"tracker": ["sensor"]},
         },
     }
     for _ in range(_n_agents)
