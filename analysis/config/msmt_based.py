@@ -22,6 +22,10 @@ agents = [
                     "angle_start": -pi,
                     "angle_stop": pi,
                 },
+                "Pd": 0.95,
+                "Dfa": 1e-4,
+                "Pp_FP": 0.99,
+                "Pp_FN": 0.99,
             }
         ],
         "pipeline": {
