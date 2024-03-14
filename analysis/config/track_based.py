@@ -26,8 +26,8 @@ agents = [
         ],
         "pipeline": {
             "type": "MappedPipeline",
-            "modules": {"extractor": lambda x, *args, **kwargs: x},
-            "mapping": {"extractor": ["sensor"]},
+            "modules": {"tracker": {"type": "BasicXyzTracker"}},
+            "mapping": {"tracker": ["sensor"]},
         },
     }
     for _ in range(_n_agents)
@@ -41,6 +41,9 @@ commandcenter = {
             "clusterer": {"type": "SampledAssignmentClusterer", "assign_radius": 4.0},
             "fusion": {"type": ""},
         },
-        "mapping": {"clusterer": ["agents", "fovs", "platforms"], "fusion": ["clusterer"]},
+        "mapping": {
+            "clusterer": ["agents", "fovs", "platforms"],
+            "fusion": ["clusterer"],
+        },
     },
 }

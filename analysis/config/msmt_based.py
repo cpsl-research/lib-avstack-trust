@@ -24,14 +24,14 @@ agents = [
                 },
                 "Pd": 0.95,
                 "Dfa": 1e-4,
-                "Pp_FP": 0.99,
-                "Pp_FN": 0.99,
+                "Pp_FP": 0,
+                "Pp_FN": 0,
             }
         ],
         "pipeline": {
             "type": "MappedPipeline",
-            "modules": {"tracker": {"type": "BasicXyzTracker"}},
-            "mapping": {"tracker": ["sensor"]},
+            "modules": {"extractor": lambda x, *args, **kwargs: x},
+            "mapping": {"extractor": ["sensor"]},
         },
     }
     for _ in range(_n_agents)

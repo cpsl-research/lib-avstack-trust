@@ -183,6 +183,7 @@ class ClusterScorerV1:
         if N_exp < 2:
             return prior
         else:
+
             def normalize(cs, exp=1):
                 return cs**exp / sum(cs**exp)
 
@@ -192,8 +193,7 @@ class ClusterScorerV1:
             w_norm = normalize(cs)
             trust = ts @ w_norm
             confidence = 1 - np.var(ts)
-            return UncertainTrustFloat(trust, confidence, prior=1/2)
-
+            return UncertainTrustFloat(trust, confidence, prior=1 / 2)
 
 
 @MODELS.register_module()
