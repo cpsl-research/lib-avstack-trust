@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING, Tuple
 if TYPE_CHECKING:
     from avstack.geometry import Shape
 
-import random
 
 import numpy as np
 from avstack.config import GEOMETRY, MODELS, ConfigDict
@@ -78,13 +77,18 @@ class SensorModel:
             0, np.random.binomial(len(objs_in_view) - n_fn_persist, p=1 - self.Pd)
         )
         if len(self._last_fn) > 0:
-            fns_persist = random.sample(
+            fns_persist = np.random.choice(
                 self._last_fn,
-                k=n_fn_persist,
+                size=n_fn_persist,
+                replace=False,
             )
         else:
             fns_persist = []
-        fns_new = list(random.sample(list(IDs.difference(fns_persist)), k=n_fn_new))
+        fns_new = list(
+            np.random.choice(
+                list(IDs.difference(fns_persist)), size=n_fn_new, replace=False
+            )
+        )
         fns = fns_persist + fns_new
         for idx in sorted(np.argwhere(IDs == fns), reverse=True):
             del objs_in_view[idx]
@@ -93,7 +97,9 @@ class SensorModel:
         n_fp_persist = np.random.binomial(n=len(self._last_fp), p=self.Pp_FP)
         n_fp_new = max(0, np.random.poisson(self.Dfa * self.fov.area) - n_fp_persist)
         # TODO: "could not convert object to sequence" error
-        fps_persist = list(random.sample(self._last_fp, k=n_fp_persist))
+        fps_persist = list(
+            np.random.choice(self._last_fp, size=n_fp_persist, replace=False)
+        )
         fps_new = [
             Position(self.fov.sample_point(), self._reference) for _ in range(n_fp_new)
         ]

@@ -3,7 +3,6 @@ from __future__ import annotations
 import argparse
 import cProfile
 import logging
-import random
 import sys
 import time
 
@@ -65,7 +64,9 @@ def do_run(MainThread):
     if args.display:
         print("Running with display...")
         app = QtWidgets.QApplication(sys.argv)
-        window = display.MainWindow(extent=extent, thread=MainThread(cfg, args.sleeps))
+        window = display.MainWindow(
+            extent=extent, thread=MainThread(cfg, seed=args.seed, sleeps=args.sleeps)
+        )
         app.exec_()
     else:
         print("Running without display...")
@@ -81,13 +82,13 @@ def do_run(MainThread):
                     sleeps=args.sleeps,
                 )
         else:
-            MainThread(cfg, args.sleeps, world=world).run()
+            MainThread(cfg, args.sleeps, seed=args.seed, world=world).run()
 
 
 @FunctionTriggerIterationMonitor(print_rate=1 / 2)
 def _run_inner(thread, world, objects, agents, commandcenter, sleeps=0.01):
     world.tick()
-    random.shuffle(agents)
+    np.random.shuffle(agents)
 
     # -- agents run sensor fusion pipelines
     for agent in agents:
@@ -126,10 +127,13 @@ class MainThread(QtCore.QThread):
     command_signal = QtCore.pyqtSignal(int, float, object, object)
     trust_signal = QtCore.pyqtSignal(int, float, object, object)
 
-    def __init__(self, cfg, sleeps=0.01, world=None, *args, **kwargs) -> None:
+    def __init__(
+        self, cfg, seed=None, sleeps=0.01, world=None, *args, **kwargs
+    ) -> None:
         super().__init__(*args, **kwargs)
         self.sleeps = sleeps
         self.world = world
+        np.random.seed(seed)
         self.initialize(cfg)
 
     def initialize(self, cfg):

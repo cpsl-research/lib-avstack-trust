@@ -1,5 +1,3 @@
-import random
-
 import numpy as np
 from avstack.config import MODELS
 from avstack.geometry import (
@@ -17,7 +15,7 @@ from avstack.geometry import (
 def random_pose_twist(extent, reference, vmin=2, vmax=5, vsig=2, buffer=10):
     x = np.array(
         [
-            random.uniform(ext[0] + buffer, ext[1] - buffer)
+            np.random.uniform(ext[0] + buffer, ext[1] - buffer)
             if ext[0] < ext[1]
             else ext[0]
             for ext in extent
