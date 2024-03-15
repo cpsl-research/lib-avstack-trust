@@ -120,6 +120,28 @@ class UncertainTrustFloat(_UncertainTrust):
 
 
 @MODELS.register_module()
+class ClusterPseudoMeasurementGenerator:
+    def __init__(self):
+        pass
+
+    def __call__(
+        self,
+        tracks,
+        msmts,
+        fovs,
+        platforms
+    ):
+        pass
+        # perform clustering on msmts
+
+        # perform assignment of clusters to existing tracks
+
+        # check out each cluster 
+
+
+
+
+@MODELS.register_module()
 class ClusterScorerV1:
     def __init__(
         self,

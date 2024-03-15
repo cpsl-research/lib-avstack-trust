@@ -37,16 +37,43 @@ agents = [
     for _ in range(_n_agents)
 ]
 
+
 commandcenter = {
     "type": "BasicCommandCenter",
     "pipeline": {
-        "type": "MappedPipeline",
-        "modules": {
-            "tracker": {
-                "type": "MeasurementBasedMultiTracker",
-                "tracker": {"type": "BasicXyzTracker"},
+        "type": "TrustBasedFusionPipeline",
+        "trust_pipeline": {
+            "type": "MappedPipeline",
+            "modules": {
+                "psms": None,
+                "estimator": None,
             },
+            "mapping": {"psms": ["tracks", "input_data", "fovs", "platforms"], "estimator": ["psms"]}
         },
-        "mapping": {"tracker": ["agents", "fovs", "platforms"]},
+        "fusion_pipeline": {
+            "type": "MappedPipeline",
+            "modules": {
+                "tracker": {
+                    "type": "MeasurementBasedMultiTracker",
+                    "tracker": {"type": "BasicXyzTracker"},
+                },
+            },
+            "mapping": {"tracker": ["input_data", "fovs", "platforms"]},
+        },
     },
 }
+
+
+# commandcenter = {
+#     "type": "BasicCommandCenter",
+#     "pipeline": {
+#         "type": "MappedPipeline",
+#         "modules": {
+#             "tracker": {
+#                 "type": "MeasurementBasedMultiTracker",
+#                 "tracker": {"type": "BasicXyzTracker"},
+#             },
+#         },
+#         "mapping": {"tracker": ["input_data", "fovs", "platforms"]},
+#     },
+# }

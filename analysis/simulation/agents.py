@@ -1,9 +1,11 @@
 import itertools
 from typing import List
 
+
 import numpy as np
 from avstack.config import AGENTS, MODELS, PIPELINE, ConfigDict
 from avstack.geometry import GlobalOrigin3D, ReferenceFrame
+
 
 
 class _Object:
@@ -203,7 +205,7 @@ class _CommandCenter:
             target_reference=GlobalOrigin3D,
         )
         output = self.pipeline(
-            data={"agents": agent_data, "fovs": fovs, "platforms": platforms},
+            data={"input_data": agent_data, "fovs": fovs, "platforms": platforms},
         )
         return output
 
