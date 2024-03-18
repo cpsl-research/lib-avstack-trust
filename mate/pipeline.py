@@ -1,7 +1,6 @@
-from typing import Any, Dict, List
+from typing import Any, Dict
 
-from avstack.config import MODELS, PIPELINE
-from avstack.modules.tracking.tracks import GroupTrack
+from avstack.config import PIPELINE
 from avstack.modules.pipeline import CustomPipeline
 from avstack.utils.decorators import apply_hooks
 
@@ -22,10 +21,6 @@ class TrustBasedFusionPipeline(CustomPipeline):
         self._last_fusion = output["fusion"]
 
         return output
-
-
-
-
 
 
 # class _TrustPipeline:

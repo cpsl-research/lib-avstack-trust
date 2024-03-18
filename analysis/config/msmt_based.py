@@ -48,7 +48,10 @@ commandcenter = {
                 "psms": None,
                 "estimator": None,
             },
-            "mapping": {"psms": ["tracks", "input_data", "fovs", "platforms"], "estimator": ["psms"]}
+            "mapping": {
+                "psms": ["tracks", "input_data", "fovs", "platforms"],
+                "estimator": ["psms"],
+            },
         },
         "fusion_pipeline": {
             "type": "MappedPipeline",

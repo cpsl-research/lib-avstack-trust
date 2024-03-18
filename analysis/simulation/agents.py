@@ -1,11 +1,9 @@
 import itertools
 from typing import List
 
-
 import numpy as np
 from avstack.config import AGENTS, MODELS, PIPELINE, ConfigDict
 from avstack.geometry import GlobalOrigin3D, ReferenceFrame
-
 
 
 class _Object:
