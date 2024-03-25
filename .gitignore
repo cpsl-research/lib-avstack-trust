@@ -1,5 +1,5 @@
 
-notebooks/figures
+notebooks/figures*
 
 .vscode
 .install.stamp
