@@ -1,3 +1,6 @@
+
+notebooks/figures*
+
 .vscode
 .install.stamp
 models

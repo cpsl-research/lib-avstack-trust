@@ -6,7 +6,8 @@ if TYPE_CHECKING:
     from scipy.stats._result_classes import BinomTestResult
 
 import numpy as np
-from avstack.config import ALGORITHMS, MODELS, ConfigDict
+import pymc as pm
+from avstack.config import MODELS, ConfigDict
 from avstack.datastructs import PriorityQueue
 from avstack.modules.estimation import kalman
 from scipy.stats import binomtest, multivariate_normal, norm
@@ -82,7 +83,7 @@ class _TrustEstimator:
 #############################################################
 
 
-@ALGORITHMS.register_module()
+@MODELS.register_module()
 class MultiTrustEstimatorWrapper(_TrustEstimator):
     multi = True
 
@@ -172,7 +173,7 @@ class _KalmanTrustEstimator(_TrustEstimator):
         )
 
 
-@ALGORITHMS.register_module()
+@MODELS.register_module()
 class DirectLinearKalmanTrustEstimator(_KalmanTrustEstimator):
     """Approximates trust as Gaussian even though it is on [0, 1]"""
 
@@ -222,14 +223,14 @@ class DirectLinearKalmanTrustEstimator(_KalmanTrustEstimator):
         self.x, self.P = kalman.kalman_linear_update(self.x, self.P, z, H, R)
 
 
-@ALGORITHMS.register_module()
+@MODELS.register_module()
 class HierarchicalExtendedKalmanTrustEstimator(_TrustEstimator):
     """Models the parameters of the Beta with Gaussians"""
 
     multi = True
 
 
-@ALGORITHMS.register_module()
+@MODELS.register_module()
 class HierarchicalUnscentedKalmanTrustEstimator(_TrustEstimator):
     """Models the parameters of the Beta with Gaussians"""
 
@@ -264,8 +265,8 @@ class HierarchicalUnscentedKalmanTrustEstimator(_TrustEstimator):
         trust: Union["UncertainTrustArray", "TrustArray"],
     ) -> None:
         """We assume z is a measurement of the mean of the Beta distribution
-        and the confidence is a measurement 
-         
+        and the confidence is a measurement
+
         We must create the
         measurement function that maps the state to the measurement space
 
@@ -278,13 +279,12 @@ class HierarchicalUnscentedKalmanTrustEstimator(_TrustEstimator):
             R = np.diag(1 - trust.confidence)
         except AttributeError:
             R = np.diag(1 - self.default_confidence * np.ones((len(z),)))
-        
 
         # def kalman_unscented_update(xp, Pp, z, h_func, R):
         # H function is a
 
 
-@ALGORITHMS.register_module()
+@MODELS.register_module()
 class GaussianCopulaTrustEstimator(_TrustEstimator):
     """A Gaussian Copula is used to model the correlations
     between the variables while ensuring that the marginals
@@ -336,7 +336,43 @@ class GaussianCopulaTrustEstimator(_TrustEstimator):
 #############################################################
 
 
-@ALGORITHMS.register_module()
+@MODELS.register_module()
+class VariationalBayesianEstimator(_TrustEstimator):
+    multi = False
+
+    def __init__(
+        self,
+        t0: float,
+        time_window: Union[int, None] = None,
+        verbose: bool = False,
+    ) -> None:
+        super().__init__(t0=t0, verbose=verbose)
+
+        # defines a hierarchical bayesian model and uses VI to solve for posterior
+        self.trust_buffer = PriorityQueue(max_size=None, max_heap=False)
+
+    def _propagate(self, dt: float) -> None:
+        pass
+
+    def _update(self, timestamp: float, trust: bool, *args, **kwargs):
+        if self.time_window:
+            self.trust_buffer.pop_all_below(priority_max=timestamp - self.time_window)
+        self.trust_buffer.push(priority=timestamp, item=trust)
+
+    def fit(self):
+        with pm.Model() as model:
+            # set up the pymc model
+            phi = pm.Uniform("phi", lower=0.0, upper=1.0)
+            lam = pm.Gamma("lambda", alpha=1.0, beta=0.5)
+            obs = [t.trust for t in self.trust_buffer.elements()]
+            trust = pm.Beta("trust", mu=phi, nu=lam, observed=obs)
+
+            # fit with variational inference
+            approx = pm.fit()
+        return approx
+
+
+@MODELS.register_module()
 class VotingTrustEstimator(_TrustEstimator):
     multi = False
 
@@ -416,7 +452,7 @@ class VotingTrustEstimator(_TrustEstimator):
             raise ValueError(f"Trust must be boolean for voting, got {trust}")
 
 
-@ALGORITHMS.register_module()
+@MODELS.register_module()
 class MaximumLikelihoodTrustEstimator(_TrustEstimator):
     multi = False
 
@@ -502,7 +538,7 @@ class MaximumLikelihoodTrustEstimator(_TrustEstimator):
                 pass
 
 
-@ALGORITHMS.register_module()
+@MODELS.register_module()
 class ParticleFilter(_TrustEstimator):
     multi = False
 
@@ -595,7 +631,7 @@ class ParticleFilter(_TrustEstimator):
         self.particles = new_particles
 
 
-@ALGORITHMS.register_module()
+@MODELS.register_module()
 class SIRParticleFilterTrustEstimator(ParticleFilter):
     def _update(self, timestamp: float, trust: float) -> None:
         """Update particles for the trust distribution"""
@@ -612,11 +648,11 @@ class SIRParticleFilterTrustEstimator(ParticleFilter):
         self.check_and_resample()
 
 
-@ALGORITHMS.register_module()
+@MODELS.register_module()
 class PHDParticleFilterTrustEstimator(ParticleFilter):
     pass
 
 
-@ALGORITHMS.register_module()
+@MODELS.register_module()
 class GaussianSumTrustEstimator(ParticleFilter):
     pass

@@ -10,7 +10,7 @@ EPS = np.finfo(float).eps
 
 
 def normalize(weight: np.ndarray) -> np.ndarray:
-    return weight / sum(weight)
+    return np.asarray(weight) / sum(weight)
 
 
 ##############################################
@@ -49,6 +49,20 @@ class CrispOperator(Operator):
     @staticmethod
     def negation(a: bool) -> bool:
         return not a
+
+
+@MODELS.register_module()
+class AverageOperator(Operator):
+    @staticmethod
+    def conjunction(a: float, b: float) -> float:
+        return (a + b) / 2
+
+    def disjunction(a: float, b: float) -> float:
+        return (a + b) / 2
+
+    @staticmethod
+    def negation(a: float) -> float:
+        return 1 - a
 
 
 @MODELS.register_module()
@@ -251,11 +265,11 @@ class WeightedAverageFuzzy(_DeMorganTriple):
 
     @staticmethod
     def norm(inputs: List[float], weight: np.ndarray) -> float:
-        return np.prod(np.asarray(inputs) * normalize(weight))
+        return np.sum(np.asarray(inputs) * normalize(weight))
 
     @staticmethod
     def conorm(inputs: List[float], weight: np.ndarray) -> float:
-        return np.prod(np.asarray(inputs) * normalize(weight))
+        return np.sum(np.asarray(inputs) * normalize(weight))
 
     @staticmethod
     def negation(inputs: List[float]) -> List[float]:

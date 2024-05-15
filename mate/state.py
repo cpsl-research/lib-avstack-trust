@@ -1,14 +1,18 @@
-from avstack.geometry.datastructs import Pose
+from typing import TYPE_CHECKING
 
-from mate.fov import FieldOfView
+
+if TYPE_CHECKING:
+    from avstack.geometry.datastructs import Pose
+
+    from mate.fov import Shape
 
 
 class Agent:
     def __init__(
         self,
         ID: int,
-        pose: Pose,
-        fov: FieldOfView,
+        pose: "Pose",
+        fov: "Shape",
         trust_prior: float,
     ) -> None:
         self.ID = ID

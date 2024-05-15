@@ -3,7 +3,7 @@ from numpy import pi
 
 _base_ = ["_default_world.py"]
 
-_n_agents = 6
+_n_agents = 2
 
 agents = [
     {
@@ -39,12 +39,11 @@ commandcenter = {
         "type": "MappedPipeline",
         "modules": {
             "clusterer": {"type": "SampledAssignmentClusterer", "assign_radius": 4.0},
-            "tracker": {
-                "type": "GroupTracker",
-                "fusion": {"type": "CovarianceIntersectionFusion"},
-                "tracker": {"type": "BasicXyzTracker"},
-            },
+            "fusion": {"type": ""},
         },
-        "mapping": {"clusterer": ["agents"], "tracker": ["clusterer"]},
+        "mapping": {
+            "clusterer": ["agents", "fovs", "platforms"],
+            "fusion": ["clusterer"],
+        },
     },
 }
