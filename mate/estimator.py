@@ -1,3 +1,4 @@
+import logging
 from typing import TYPE_CHECKING, Dict, Union
 
 import numpy as np
@@ -29,8 +30,9 @@ class TrustEstimator:
         propagation_model="uncertainty",
         clusterer: ConfigDict = {
             "type": "SampledAssignmentClusterer",
-            "assign_radius": 0.05,
+            "assign_radius": 1.0,
         },
+        assign_threshold: float = 1.0,
     ):
         self.Pd = Pd
         self.clusterer = MODELS.build(clusterer)
@@ -41,9 +43,11 @@ class TrustEstimator:
         self._prior_agents = prior_agents
         self._prior_tracks = prior_tracks
         self._prior_means = {"distrusted": 0.2, "untrusted": 0.5, "trusted": 0.8}
-        self.tracks = {}
+        self.tracks = []
         self.agent_trust = {}
         self.track_trust = {}
+        self._inactive_track_trust = {}
+        self.assign_threshold = assign_threshold
 
     def __call__(
         self,
@@ -55,6 +59,19 @@ class TrustEstimator:
     ):
         if self.do_propagate:
             self.propagate()
+
+        # -- initialize new distributions
+        self.tracks = tracks
+        self.init_new_agents(agents, fovs)
+        self.init_new_tracks(tracks)
+
+        # -- prune old distributions
+        track_IDs = [track.ID for track in tracks]
+        # convert keys to list to handle popping during looping
+        for track_trust_ID in list(self.track_trust.keys()):
+            if track_trust_ID not in track_IDs:
+                self._inactive_track_trust = self.track_trust[track_trust_ID]
+                self.track_trust.pop(track_trust_ID)
 
         # -- update agent trust
         self.update_agent_trust(fovs, agent_tracks)
@@ -71,6 +88,22 @@ class TrustEstimator:
         beta = (1 - mean) * precision
         return TrustBetaParams(alpha, beta)
 
+    def init_new_agents(self, agents, fovs):
+        for i_agent in fovs:
+            if i_agent not in self.agent_trust:
+                prior = self._prior_agents.get(
+                    i_agent, {"type": "untrusted", "strength": 1}
+                )
+                self.agent_trust[i_agent] = self.init_trust_distribution(prior)
+
+    def init_new_tracks(self, tracks):
+        for track in tracks:
+            if track.ID not in self.track_trust:
+                prior = self._prior_tracks.get(
+                    track.ID, {"type": "untrusted", "strength": 1}
+                )
+                self.track_trust[track.ID] = self.init_trust_distribution(prior)
+
     def psm_track(
         self,
         agents: Dict[int, np.ndarray],
@@ -86,7 +119,7 @@ class TrustEstimator:
                 if saw:  # positive result
                     dets = cluster.get_objects_by_agent_ID(i_agent)
                     if len(dets) > 1:
-                        raise RuntimeError
+                        logging.warning("Clustered more than one detection to track...")
                     psm = PSM(value=1.0, confidence=self.agent_trust[i_agent].mean)
                 else:  # negative result
                     psm = PSM(value=0.0, confidence=self.agent_trust[i_agent].mean)
@@ -108,20 +141,19 @@ class TrustEstimator:
             [t.x[:2] for t in tracks_central],
             check_reference=False,
         )
-        assign = gnn_single_frame_assign(A, cost_threshold=0.2)
+        assign = gnn_single_frame_assign(A, cost_threshold=self.assign_threshold)
 
         # assignments provide psms proportional to track trust
-        psms = []
+        means = []
+        confidences = []
         for i_trk_agent, j_trk_central in assign.iterate_over(
             "rows", with_cost=False
         ).items():
             j_trk_central = j_trk_central[0]  # assumes one assignment
             ID_central = tracks_central[j_trk_central].ID
             if self.track_trust[ID_central].precision > min_prec:
-                mean = self.track_trust[ID_central].mean
-                confidence = 1 - self.track_trust[ID_central].variance
-                assert confidence > 0
-                psms.append(PSM(value=mean, confidence=confidence))
+                means.append(self.track_trust[ID_central].mean)
+                confidences.append(1 - self.track_trust[ID_central].variance)
 
         # tracks in central not in local provide psms inversely proportional to trust
         for j_trk_central in assign.unassigned_cols:
@@ -130,16 +162,15 @@ class TrustEstimator:
                 if self.track_trust[ID_central].precision > min_prec:
                     mean = self.track_trust[ID_central].mean
                     confidence = 1 - self.track_trust[ID_central].variance
-                    assert confidence > 0
-                    psms.append(PSM(value=1 - mean, confidence=confidence))
+                    means.append(mean)
+                    confidences.append(confidence)
 
         # tracks in local not in central are unclear...
+        # TODO
 
         # reduce to a single PSM per frame
-        means = [p.value for p in psms]
-        confs = [p.confidence for p in psms]
-        if len(means) > 0:
-            psms = [PSM(value=min(means), confidence=confs[np.argmin(means)])]
+        # TODO: this is not a good way to do it
+        psms = [PSM(value=np.mean(means), confidence=np.mean(confidences))]
         return psms
 
     def propagate(self, w_prior=0.2):
@@ -175,21 +206,12 @@ class TrustEstimator:
                 raise NotImplementedError
 
     def update_track_trust(self, agents, fovs, dets, tracks):
-        # save the tracks
-        self.tracks = tracks
-        for track in tracks:
-            if track.ID not in self.track_trust:
-                prior = self._prior_tracks.get(
-                    track.ID, {"type": "untrusted", "strength": 1}
-                )
-                self.track_trust[track.ID] = self.init_trust_distribution(prior)
-
         # cluster the detections
         clusters = self.clusterer(dets, frame=0, timestamp=0)
 
         # assign clusters to existing tracks for IDs
         A = build_A_from_distance(clusters, tracks)
-        assign = gnn_single_frame_assign(A, cost_threshold=0.2)
+        assign = gnn_single_frame_assign(A, cost_threshold=self.assign_threshold)
 
         # assignments - run pseudomeasurement generation
         for j_clust, i_track in assign.iterate_over("rows", with_cost=False).items():
@@ -221,11 +243,6 @@ class TrustEstimator:
 
     def update_agent_trust(self, fovs, agent_tracks):
         for i_agent in fovs:
-            if i_agent not in self.agent_trust:
-                prior = self._prior_agents.get(
-                    i_agent, {"type": "untrusted", "strength": 1}
-                )
-                self.agent_trust[i_agent] = self.init_trust_distribution(prior)
             psms = self.psm_agent(fovs[i_agent], agent_tracks[i_agent], self.tracks)
             for psm in psms:
                 self.agent_trust[i_agent].alpha += psm.confidence * psm.value
