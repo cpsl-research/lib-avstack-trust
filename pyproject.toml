@@ -16,8 +16,9 @@ classifiers = [
 python = "~3.10"
 pymc = "~5.10.4"
 PyQt5 = "=5.15.2"
-lib-avstack-core = { path = "third_party/lib-avstack-core", develop = true, extras = [] }
 matplotlib-label-lines = "~0.7.0"
+# comment out when using as submodule
+# lib-avstack-core = { path = "third_party/lib-avstack-core", develop = true, extras = [] }
 
 [tool.poetry.group.test.dependencies]
 pytest = "^7"
