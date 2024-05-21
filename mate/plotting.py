@@ -305,7 +305,11 @@ def plot_trust(
         else:
             label = f"Track {track.ID}"
         ax.barh(
-            y=i_track, width=trust_estimator.track_trust[track.ID].mean, label=label
+            y=i_track,
+            width=trust_estimator.track_trust[track.ID].mean,
+            xerr=trust_estimator.track_trust[track.ID].std,
+            capsize=4,
+            label=label,
         )
     ax.set_xlim([0, 1.0])
     ax.set_xlabel("Track Trust Score")
@@ -316,6 +320,31 @@ def plot_trust(
     plt.tight_layout()
     if save:
         plt.savefig(os.path.join(fig_dir, "experiment_track_trusts_bar.pdf"))
+    plt.show()
+
+    # plot agent trusts in bar format
+    fig, ax = plt.subplots(figsize=(5, 4))
+    for i_agent, (ID, color) in enumerate(
+        zip(trust_estimator.agent_trust, agent_colors)
+    ):
+        label = f"Agent {track.ID}"
+        ax.barh(
+            y=i_agent,
+            width=trust_estimator.agent_trust[ID].mean,
+            xerr=trust_estimator.agent_trust[ID].std,
+            capsize=7,
+            label=label,
+            color=color,
+        )
+    ax.set_xlim([0, 1.0])
+    ax.set_xlabel("Agent Trust Score")
+    ax.set_ylabel("PDF")
+    ax.set_yticks(list(range(len(trust_estimator.agent_trust))))
+    ax.set_yticklabels([f"Agent {ID}" for ID in trust_estimator.agent_trust])
+    ax.set_title("Agent Trusts")
+    plt.tight_layout()
+    if save:
+        plt.savefig(os.path.join(fig_dir, "experiment_agent_trusts_bar.pdf"))
     plt.show()
 
 

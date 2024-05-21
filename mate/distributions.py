@@ -1,4 +1,22 @@
-class TrustBetaParams:
+from typing import TYPE_CHECKING
+
+
+if TYPE_CHECKING:
+    from .measurement import PSM
+
+import math
+
+
+class TrustDistribution:
+    @property
+    def std(self):
+        return math.sqrt(self.variance)
+
+    def update(self, psm: "PSM"):
+        raise NotImplementedError
+
+
+class TrustBetaParams(TrustDistribution):
     def __init__(self, alpha, beta):
         self.alpha = alpha
         self.beta = beta
@@ -27,3 +45,7 @@ class TrustBetaParams:
 
     def copy(self):
         return TrustBetaParams(self.alpha, self.beta)
+
+    def update(self, psm: "PSM"):
+        self.alpha += psm.confidence * psm.value
+        self.beta += psm.confidence * (1 - psm.value)
