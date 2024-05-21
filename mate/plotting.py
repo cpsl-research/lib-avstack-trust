@@ -1,4 +1,5 @@
 import os
+from typing import Any
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -116,19 +117,46 @@ def _add_tracks(ax, tracks, swap_axes=False):
     return ax
 
 
-def plot_agents(agents, fovs, swap_axes=False, save=False, fig_dir="figures", **kwargs):
-    fig, ax = plt.subplots()
-    _add_agents_fovs(ax, agents, fovs, swap_axes=swap_axes, **kwargs)
-    set_axes(ax)
-    if save:
-        plt.savefig(os.path.join(fig_dir, "agents.pdf"))
-    plt.show()
+class TrustPlot:
+    def __call__(
+        self,
+        *args: Any,
+        show=True,
+        save=False,
+        fig_dir="figures",
+        suffix="",
+        extension="pdf",
+        **kwds: Any,
+    ) -> Any:
+        title = self.plot(*args, fig=fig, ax=ax, **kwds)
 
 
-def plot_agents_objects(
-    agents, fovs, objects, fps, fns, swap_axes=False, save=False, fig_dir="figures"
+def _plot_preliminaries(figsize=(5, 4)):
+    fig, ax = plt.subplots(figsize=figsize)
+    return fig, ax
+
+
+def _plot_post(
+    title, show=True, save=False, fig_dir="figures", suffix="", extension="pdf"
 ):
-    fig, ax = plt.subplots()
+    plt.tight_layout()
+    if save:
+        os.makedirs(fig_dir, exist_ok=True)
+        plt.savefig(os.path.join(fig_dir, f"{title}{suffix}.{extension}"))
+    if show:
+        plt.show()
+
+
+def plot_agents(agents, fovs, swap_axes=False, **kwds):
+    fig, ax = _plot_preliminaries()
+    _add_agents_fovs(ax, agents, fovs, swap_axes=swap_axes, **kwds)
+    set_axes(ax)
+    _plot_post(title="agents", **kwds)
+
+
+def plot_agents_objects(agents, fovs, objects, fps, fns, swap_axes=False, **kwds):
+    fig, ax = _plot_preliminaries()
+
     idxs = [1, 0] if swap_axes else [0, 1]
     ax = _add_agents_fovs(ax, agents, fovs, swap_axes=swap_axes)
     ax = _add_objects(ax, objects, swap_axes=swap_axes)
@@ -152,50 +180,56 @@ def plot_agents_objects(
             color=agent_colors[fn[0]],
             label="FN" if i == 0 else "",
         )
-
     set_axes(ax)
-    if save:
-        plt.savefig(os.path.join(fig_dir, "experiment_truth.pdf"))
-    plt.show()
+    _plot_post(title="agents-objects", **kwds)
 
 
 def plot_agents_detections(
-    agents, fovs, dets, objects=None, swap_axes=False, save=False, fig_dir="figures"
+    agents,
+    fovs,
+    dets,
+    objects=None,
+    swap_axes=False,
+    **kwds,
 ):
-    fig, ax = plt.subplots()
+    fig, ax = _plot_preliminaries()
     _add_agents_fovs(ax, agents, fovs, swap_axes=swap_axes)
     _add_objects(ax, objects, swap_axes=swap_axes)
     _add_detections(ax, dets, swap_axes=swap_axes)
     set_axes(ax)
-    if save:
-        plt.savefig(os.path.join(fig_dir, "experiment_detections.pdf"))
-    plt.show()
+    _plot_post(title="experiment_detections", **kwds)
 
 
 def plot_agents_clusters(
-    agents, fovs, clusters, objects=None, swap_axes=False, save=False, fig_dir="figures"
+    agents,
+    fovs,
+    clusters,
+    objects=None,
+    swap_axes=False,
+    **kwds,
 ):
-    fig, ax = plt.subplots()
+    fig, ax = _plot_preliminaries()
     _add_agents_fovs(ax, agents, fovs)
     _add_objects(ax, objects, swap_axes=swap_axes)
     _add_clusters(ax, clusters, swap_axes=swap_axes)
     set_axes(ax)
-    if save:
-        plt.savefig(os.path.join(fig_dir, "experiment_clusters.pdf"))
-    plt.show()
+    _plot_post(title="experiment_clusters", **kwds)
 
 
 def plot_agents_tracks(
-    agents, fovs, tracks, objects=None, swap_axes=False, save=False, fig_dir="figures"
+    agents,
+    fovs,
+    tracks,
+    objects=None,
+    swap_axes=False,
+    **kwds,
 ):
-    fig, ax = plt.subplots()
+    fig, ax = _plot_preliminaries()
     _add_agents_fovs(ax, agents, fovs, swap_axes=swap_axes)
     _add_objects(ax, objects, swap_axes=swap_axes)
     _add_tracks(ax, tracks, swap_axes=swap_axes)
     set_axes(ax)
-    if save:
-        plt.savefig(os.path.join(fig_dir, "experiment_tracks.pdf"))
-    plt.show()
+    _plot_post(title="experiment_tracks", **kwds)
 
 
 def plot_trust(
@@ -203,8 +237,7 @@ def plot_trust(
     objects=None,
     show_legend=False,
     use_labellines=False,
-    save=False,
-    fig_dir="figures",
+    **kwds,
 ):
     tracks_sorted = sorted(trust_estimator.tracks, key=lambda x: x.ID, reverse=False)
 
@@ -216,7 +249,7 @@ def plot_trust(
         assigns = None
 
     # plot all track trust distributions
-    fig, ax = plt.subplots(figsize=(5, 4))
+    fig, ax = _plot_preliminaries(figsize=(5, 4))
     x = np.linspace(0, 1.0, 10000)
     for i_track, track in enumerate(tracks_sorted):
         if assigns is not None:
@@ -257,13 +290,10 @@ def plot_trust(
     ax.set_ylabel("PDF")
     ax.set_yticklabels([])
     ax.set_title("Track Trusts")
-    plt.tight_layout()
-    if save:
-        plt.savefig(os.path.join(fig_dir, "experiment_track_trusts.pdf"))
-    plt.show()
+    _plot_post(title="experiment_track_trusts", **kwds)
 
     # plot all agent trust distributions
-    fig, ax = plt.subplots(figsize=(5, 4))
+    fig, ax = _plot_preliminaries(figsize=(5, 4))
     x = np.linspace(0, 1.0, 10000)
     for ID, color in zip(trust_estimator.agent_trust, agent_colors):
         y = beta.pdf(
@@ -288,13 +318,10 @@ def plot_trust(
     ax.set_ylabel("PDF")
     ax.set_yticklabels([])
     ax.set_title("Agent Trusts")
-    plt.tight_layout()
-    if save:
-        plt.savefig(os.path.join(fig_dir, "experiment_agent_trusts.pdf"))
-    plt.show()
+    _plot_post(title="experiment_agent_trusts", **kwds)
 
     # plot track trusts in bar format
-    fig, ax = plt.subplots(figsize=(5, 4))
+    fig, ax = _plot_preliminaries(figsize=(5, 4))
     for i_track, track in enumerate(tracks_sorted):
         if assigns is not None:
             label = (
@@ -317,13 +344,10 @@ def plot_trust(
     ax.set_yticks(list(range(len(trust_estimator.tracks))))
     ax.set_yticklabels([f"Track {track.ID}" for track in tracks_sorted])
     ax.set_title("Track Trusts")
-    plt.tight_layout()
-    if save:
-        plt.savefig(os.path.join(fig_dir, "experiment_track_trusts_bar.pdf"))
-    plt.show()
+    _plot_post(title="experiment_track_trusts_bar", **kwds)
 
     # plot agent trusts in bar format
-    fig, ax = plt.subplots(figsize=(5, 4))
+    fig, ax = _plot_preliminaries(figsize=(5, 4))
     for i_agent, (ID, color) in enumerate(
         zip(trust_estimator.agent_trust, agent_colors)
     ):
@@ -342,13 +366,12 @@ def plot_trust(
     ax.set_yticks(list(range(len(trust_estimator.agent_trust))))
     ax.set_yticklabels([f"Agent {ID}" for ID in trust_estimator.agent_trust])
     ax.set_title("Agent Trusts")
-    plt.tight_layout()
-    if save:
-        plt.savefig(os.path.join(fig_dir, "experiment_agent_trusts_bar.pdf"))
-    plt.show()
+    _plot_post(title="experiment_agent_trusts_bar", **kwds)
 
 
-def plot_metrics(df, save=False, fig_dir="figures"):
+def plot_metrics(df, **kwds):
+    fig, ax = _plot_preliminaries()
+
     # aggregate and normalize by number of occurrences
     df_agg = df.groupby("n_observers")[list(range(7))].sum().T.astype(float)
     df_agg[1:4] /= df_agg[1:4].sum().astype(float)
@@ -372,7 +395,4 @@ def plot_metrics(df, save=False, fig_dir="figures"):
 
     # plt.xlabel('Case Index')
     plt.ylabel("Fraction of Cases")
-    plt.tight_layout()
-    if save:
-        plt.savefig(os.path.join(fig_dir, "experiment_metrics.pdf"))
-    plt.show()
+    _plot_post(title="experiment_metrics", **kwds)

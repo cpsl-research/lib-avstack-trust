@@ -14,6 +14,7 @@ from .config import MATE
 from .distributions import TrustBetaParams
 
 
+@MATE.register_module()
 class TrustEstimator:
     def __init__(
         self,
@@ -75,12 +76,12 @@ class TrustEstimator:
                 self.track_trust.pop(track_trust_ID)
 
         # -- update agent trust
-        self.update_agent_trust(fovs, agent_tracks, tracks)
+        psms_agents = self.update_agent_trust(fovs, agent_tracks, tracks)
 
         # -- update object trust
-        clusters = self.update_track_trust(agents, fovs, dets, tracks)
+        psms_tracks, clusters = self.update_track_trust(agents, fovs, dets, tracks)
 
-        return clusters
+        return clusters, psms_agents, psms_tracks
 
     def init_trust_distribution(self, prior):
         mean = self._prior_means[prior["type"]]
@@ -153,7 +154,7 @@ class TrustEstimator:
             for psm in psms:
                 self.track_trust[ID_track].update(psm)
 
-        return clusters
+        return psms_tracks, clusters
 
     def update_agent_trust(self, fovs, tracks_agent, tracks):
         # update the parameters from psms
@@ -161,3 +162,4 @@ class TrustEstimator:
         for i_agent, psms in psms_agents.items():
             for psm in psms:
                 self.agent_trust[i_agent].update(psm)
+        return psms_agents

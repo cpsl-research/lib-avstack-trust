@@ -112,15 +112,24 @@ class ViewBasedPsm(PsmGenerator):
 
     def psm_tracks(self, agents, fovs, agent_trust, clusters, tracks, assign):
         """Obtains PSMs for all tracks"""
-        psms_tracks = {i_track: [] for i_track in tracks}  # this is unnecessary
+        psms_tracks = {track.ID: [] for track in tracks}  # this is unnecessary
 
         # assignments - run pseudomeasurement generation
         for j_clust, i_track in assign.iterate_over("rows", with_cost=False).items():
             i_track = i_track[0]  # one edge only
             ID_track = tracks[i_track].ID
-            psms_tracks[ID_track] = self.psm_track(
+            psms_tracks[ID_track] = self.psm_track_assigned(
                 agents, fovs, agent_trust, clusters[j_clust], tracks[i_track]
             )
+
+        # ***enforce constraint on number of updates***
+        # if a track has only a single positive PSM, we cannot use it to
+        # update, otherwise we fall into an echo-chamber effect where an
+        # agent will continue to increase the trust score even if
+        # no other agent can verify the existence
+        for ID_track, psms in psms_tracks.items():
+            if len(psms) < 2:
+                psms_tracks[ID_track] = []
 
         # lone clusters - do not do anything, assume they start new tracks
         for j_clust in assign.unassigned_rows:
@@ -129,10 +138,13 @@ class ViewBasedPsm(PsmGenerator):
         # lone tracks - penalize because of no detections (if in view)
         for i_track in assign.unassigned_cols:
             ID_track = tracks[i_track].ID
-            psms_tracks[ID_track] = [PSM(value=0.0, confidence=1.0)]
+            psms_tracks[ID_track] = self.psm_track_unassigned(
+                agents, fovs, agent_trust, tracks[i_track]
+            )
+
         return psms_tracks
 
-    def psm_track(
+    def psm_track_assigned(
         self,
         agents: Dict[int, np.ndarray],
         fovs: Dict[int, Union["Shape", np.ndarray]],
@@ -154,6 +166,18 @@ class ViewBasedPsm(PsmGenerator):
                 else:  # negative result
                     psm = PSM(value=0.0, confidence=agent_trusts[i_agent].mean)
                 psms.append(psm)
-            else:
-                pass  # not expected to see
+        return psms
+
+    def psm_track_unassigned(
+        self,
+        agents: Dict[int, np.ndarray],
+        fovs: Dict[int, Union["Shape", np.ndarray]],
+        agent_trusts: Dict[int, TrustDistribution],
+        track: "TrackBase",
+    ):
+        psms = []
+        for i_agent in fovs:
+            if points_in_fov(track.x[:2], fovs[i_agent]):
+                psm = PSM(value=0.0, confidence=agent_trusts[i_agent].mean)
+                psms.append(psm)
         return psms
