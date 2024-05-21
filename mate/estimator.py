@@ -12,7 +12,6 @@ from avstack.modules.assignment import build_A_from_distance, gnn_single_frame_a
 
 from .config import MATE
 from .distributions import TrustBetaParams
-from .measurement import PSM
 
 
 class TrustEstimator:
@@ -76,7 +75,7 @@ class TrustEstimator:
                 self.track_trust.pop(track_trust_ID)
 
         # -- update agent trust
-        self.update_agent_trust(fovs, agent_tracks)
+        self.update_agent_trust(fovs, agent_tracks, tracks)
 
         # -- update object trust
         clusters = self.update_track_trust(agents, fovs, dets, tracks)
@@ -146,36 +145,19 @@ class TrustEstimator:
         A = build_A_from_distance(clusters, tracks)
         assign = gnn_single_frame_assign(A, cost_threshold=self.assign_radius)
 
-        # assignments - run pseudomeasurement generation
-        for j_clust, i_track in assign.iterate_over("rows", with_cost=False).items():
-            i_track = i_track[0]  # one edge only
-            ID_track = tracks[i_track].ID
-            psms = self.psm.psm_track(agents, fovs, self.agent_trust, clusters[j_clust])
-
-            # update the parameters
-            if len(psms) > 1:
-                for psm in psms:
-                    self.track_trust[ID_track].update(psm)
-
-        # lone clusters - do not do anything, assume they start new tracks
-        if len(assign.unassigned_rows) > 0:
-            pass
-
-        # lone tracks - penalize because of no detections (if in view)
-        if len(assign.unassigned_cols) > 0:
-            for i_track in assign.unassigned_cols:
-                ID_track = tracks[i_track].ID
-                psm = PSM(
-                    value=0.0, confidence=1.0
-                )  # TODO: merge this in with other PSM generation
+        # update the parameters from psms
+        psms_tracks = self.psm.psm_tracks(
+            agents, fovs, self.agent_trust, clusters, tracks, assign
+        )
+        for ID_track, psms in psms_tracks.items():
+            for psm in psms:
                 self.track_trust[ID_track].update(psm)
 
         return clusters
 
-    def update_agent_trust(self, fovs, agent_tracks):
-        for i_agent in fovs:
-            psms = self.psm.psm_agent(
-                fovs[i_agent], agent_tracks[i_agent], self.tracks, self.track_trust
-            )
+    def update_agent_trust(self, fovs, tracks_agent, tracks):
+        # update the parameters from psms
+        psms_agents = self.psm.psm_agents(fovs, tracks_agent, tracks, self.track_trust)
+        for i_agent, psms in psms_agents.items():
             for psm in psms:
                 self.agent_trust[i_agent].update(psm)
