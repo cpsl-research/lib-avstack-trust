@@ -6,6 +6,7 @@ if TYPE_CHECKING:
     from avstack.datastructs import DataContainer
     from avstack.geometry import Shape
     from avstack.modules.clustering import Cluster
+    from avstack.modules.tracking import TrackBase
 
 import numpy as np
 from avstack.geometry.fov import points_in_fov
@@ -51,6 +52,7 @@ class ViewBasedPsm(PsmGenerator):
         self.min_prec = min_prec
 
     def psm_agents(self, fovs, tracks_agents, tracks, track_trust):
+        """Obtains PSMs for all agents"""
         psms_agents = {i_agent: [] for i_agent in fovs}  # this is unnecessary
         for i_agent in fovs:
             psms_agents[i_agent] = self.psm_agent(
@@ -68,7 +70,7 @@ class ViewBasedPsm(PsmGenerator):
         tracks: "DataContainer",
         track_trust: Dict[int, TrustDistribution],
     ):
-        """Creates PSM for one agent"""
+        """Creates PSMs for one agent"""
         # assign agent tracks to central tracks
         A = build_A_from_distance(
             [t.x[:2] for t in tracks_agent],
@@ -76,38 +78,40 @@ class ViewBasedPsm(PsmGenerator):
             check_reference=False,
         )
         assign = gnn_single_frame_assign(A, cost_threshold=self.assign_radius)
+        psms = []
 
         # assignments provide psms proportional to track trust
-        means = []
-        confidences = []
         for i_trk_agent, j_trk_central in assign.iterate_over(
             "rows", with_cost=False
         ).items():
             j_trk_central = j_trk_central[0]  # assumes one assignment
             ID_central = tracks[j_trk_central].ID
             if track_trust[ID_central].precision > self.min_prec:
-                means.append(track_trust[ID_central].mean)
-                confidences.append(1 - track_trust[ID_central].variance)
+                value = track_trust[ID_central].mean
+                confidence = 1 - track_trust[ID_central].variance
+                psms.append(PSM(value=value, confidence=confidence))
+            else:
+                raise NotImplementedError()
+
+        # tracks in local not in central are unclear...
+        for i_trk_agent in assign.unassigned_rows:
+            pass
 
         # tracks in central not in local provide psms inversely proportional to trust
         for j_trk_central in assign.unassigned_cols:
             if points_in_fov(tracks[j_trk_central].x[:2], fov):
                 ID_central = tracks[j_trk_central].ID
                 if track_trust[ID_central].precision > self.min_prec:
-                    mean = track_trust[ID_central].mean
+                    value = track_trust[ID_central].mean
                     confidence = 1 - track_trust[ID_central].variance
-                    means.append(mean)
-                    confidences.append(confidence)
+                    psms.append(PSM(value=value, confidence=confidence))
+                else:
+                    raise NotImplementedError()
 
-        # tracks in local not in central are unclear...
-        # TODO
-
-        # reduce to a single PSM per frame
-        # TODO: this is not a good way to do it
-        psms = [PSM(value=np.mean(means), confidence=np.mean(confidences))]
         return psms
 
     def psm_tracks(self, agents, fovs, agent_trust, clusters, tracks, assign):
+        """Obtains PSMs for all tracks"""
         psms_tracks = {i_track: [] for i_track in tracks}  # this is unnecessary
 
         # assignments - run pseudomeasurement generation
@@ -115,7 +119,7 @@ class ViewBasedPsm(PsmGenerator):
             i_track = i_track[0]  # one edge only
             ID_track = tracks[i_track].ID
             psms_tracks[ID_track] = self.psm_track(
-                agents, fovs, agent_trust, clusters[j_clust]
+                agents, fovs, agent_trust, clusters[j_clust], tracks[i_track]
             )
 
         # lone clusters - do not do anything, assume they start new tracks
@@ -134,11 +138,12 @@ class ViewBasedPsm(PsmGenerator):
         fovs: Dict[int, Union["Shape", np.ndarray]],
         agent_trusts: Dict[int, TrustDistribution],
         cluster: "Cluster",
+        track: "TrackBase",
     ):
-        """Creates PSM for one cluster"""
+        """Creates PSMs for one track"""
         psms = []
         for i_agent in fovs:
-            if points_in_fov(cluster.centroid().x[:2], fovs[i_agent]):
+            if points_in_fov(track.x[:2], fovs[i_agent]):
                 # Get the PSM
                 saw = i_agent in cluster.agent_IDs  # did this agent see it?
                 if saw:  # positive result
