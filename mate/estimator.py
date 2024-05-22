@@ -83,7 +83,10 @@ class TrustEstimator:
         psms_agents = self.update_agent_trust(fovs, agent_tracks, tracks)
 
         # -- update object trust
-        psms_tracks, clusters = self.update_track_trust(agents, fovs, dets, tracks)
+        # psms_tracks, clusters = self.update_track_trust(agents, fovs, dets, tracks)
+        psms_tracks, clusters = self.update_track_trust(
+            agents, fovs, agent_tracks, tracks
+        )
 
         return clusters, psms_agents, psms_tracks
 

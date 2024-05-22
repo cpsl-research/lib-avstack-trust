@@ -1,5 +1,4 @@
 import os
-from typing import Any
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -117,32 +116,24 @@ def _add_tracks(ax, tracks, swap_axes=False):
     return ax
 
 
-class TrustPlot:
-    def __call__(
-        self,
-        *args: Any,
-        show=True,
-        save=False,
-        fig_dir="figures",
-        suffix="",
-        extension="pdf",
-        **kwds: Any,
-    ) -> Any:
-        title = self.plot(*args, fig=fig, ax=ax, **kwds)
-
-
 def _plot_preliminaries(figsize=(5, 4)):
     fig, ax = plt.subplots(figsize=figsize)
     return fig, ax
 
 
 def _plot_post(
-    title, show=True, save=False, fig_dir="figures", suffix="", extension="pdf"
+    title,
+    show=True,
+    save=False,
+    fig_dir="figures",
+    subfig_dir="",
+    suffix="",
+    extension="pdf",
 ):
     plt.tight_layout()
     if save:
-        os.makedirs(fig_dir, exist_ok=True)
-        plt.savefig(os.path.join(fig_dir, f"{title}{suffix}.{extension}"))
+        os.makedirs(os.path.join(fig_dir, subfig_dir), exist_ok=True)
+        plt.savefig(os.path.join(fig_dir, subfig_dir, f"{title}{suffix}.{extension}"))
     if show:
         plt.show()
     else:
@@ -239,6 +230,7 @@ def plot_trust(
     objects=None,
     show_legend=False,
     use_labellines=False,
+    use_subfolders=False,
     **kwds,
 ):
     tracks_sorted = sorted(trust_estimator.tracks, key=lambda x: x.ID, reverse=False)
@@ -292,7 +284,9 @@ def plot_trust(
     ax.set_ylabel("PDF")
     ax.set_yticklabels([])
     ax.set_title("Track Trusts")
-    _plot_post(title="experiment_track_trusts", **kwds)
+    title = "experiment_track_trusts"
+    subfig_dir = "track_trust_dist" if use_subfolders else ""
+    _plot_post(title=title, subfig_dir=subfig_dir, **kwds)
 
     # plot all agent trust distributions
     fig, ax = _plot_preliminaries(figsize=(5, 4))
@@ -320,7 +314,9 @@ def plot_trust(
     ax.set_ylabel("PDF")
     ax.set_yticklabels([])
     ax.set_title("Agent Trusts")
-    _plot_post(title="experiment_agent_trusts", **kwds)
+    title = "experiment_agent_trusts"
+    subfig_dir = "agent_trust_dist" if use_subfolders else ""
+    _plot_post(title=title, subfig_dir=subfig_dir, **kwds)
 
     # plot track trusts in bar format
     fig, ax = _plot_preliminaries(figsize=(5, 4))
@@ -333,10 +329,15 @@ def plot_trust(
             )
         else:
             label = f"Track {track.ID}"
+        a = trust_estimator.track_trust[track.ID].alpha
+        b = trust_estimator.track_trust[track.ID].beta
+        mean = trust_estimator.track_trust[track.ID].mean
+        x_below = beta.ppf(0.025, a, b)
+        x_above = beta.ppf(0.975, a, b)
         ax.barh(
             y=i_track,
-            width=trust_estimator.track_trust[track.ID].mean,
-            xerr=trust_estimator.track_trust[track.ID].std,
+            width=mean,
+            xerr=np.array([[mean - x_below], [x_above - mean]]),
             capsize=4,
             label=label,
         )
@@ -346,7 +347,9 @@ def plot_trust(
     ax.set_yticks(list(range(len(trust_estimator.tracks))))
     ax.set_yticklabels([f"Track {track.ID}" for track in tracks_sorted])
     ax.set_title("Track Trusts")
-    _plot_post(title="experiment_track_trusts_bar", **kwds)
+    title = "experiment_track_trusts_bar"
+    subfig_dir = "track_trust_bar" if use_subfolders else ""
+    _plot_post(title=title, subfig_dir=subfig_dir, **kwds)
 
     # plot agent trusts in bar format
     fig, ax = _plot_preliminaries(figsize=(5, 4))
@@ -354,10 +357,15 @@ def plot_trust(
         zip(trust_estimator.agent_trust, agent_colors)
     ):
         label = f"Agent {ID}"
+        a = trust_estimator.agent_trust[ID].alpha
+        b = trust_estimator.agent_trust[ID].beta
+        mean = trust_estimator.agent_trust[ID].mean
+        x_below = beta.ppf(0.025, a, b)
+        x_above = beta.ppf(0.975, a, b)
         ax.barh(
             y=i_agent,
             width=trust_estimator.agent_trust[ID].mean,
-            xerr=trust_estimator.agent_trust[ID].std,
+            xerr=np.array([[mean - x_below], [x_above - mean]]),
             capsize=7,
             label=label,
             color=color,
@@ -368,7 +376,9 @@ def plot_trust(
     ax.set_yticks(list(range(len(trust_estimator.agent_trust))))
     ax.set_yticklabels([f"Agent {ID}" for ID in trust_estimator.agent_trust])
     ax.set_title("Agent Trusts")
-    _plot_post(title="experiment_agent_trusts_bar", **kwds)
+    title = "experiment_agent_trusts_bar"
+    subfig_dir = "agent_trust_bar" if use_subfolders else ""
+    _plot_post(title=title, subfig_dir=subfig_dir, **kwds)
 
 
 def plot_metrics(df, **kwds):
