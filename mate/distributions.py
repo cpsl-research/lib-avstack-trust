@@ -6,6 +6,8 @@ if TYPE_CHECKING:
 
 import math
 
+from mate.config import MATE
+
 
 class TrustDistribution:
     @property
@@ -16,7 +18,8 @@ class TrustDistribution:
         raise NotImplementedError
 
 
-class TrustBetaParams(TrustDistribution):
+@MATE.register_module()
+class TrustBetaDistribution(TrustDistribution):
     def __init__(self, alpha, beta):
         self.alpha = alpha
         self.beta = beta
@@ -25,7 +28,7 @@ class TrustBetaParams(TrustDistribution):
         return self.__str__()
 
     def __str__(self) -> str:
-        return f"TrustBetaParams: ({self.alpha:5.2f}, {self.beta:5.2f})"
+        return f"TrustBetaDistribution: ({self.alpha:5.2f}, {self.beta:5.2f})"
 
     @property
     def mean(self):
@@ -44,7 +47,7 @@ class TrustBetaParams(TrustDistribution):
         )
 
     def copy(self):
-        return TrustBetaParams(self.alpha, self.beta)
+        return TrustBetaDistribution(self.alpha, self.beta)
 
     def update(self, psm: "PSM"):
         self.alpha += psm.confidence * psm.value

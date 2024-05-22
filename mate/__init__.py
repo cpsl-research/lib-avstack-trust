@@ -1,4 +1,12 @@
-from . import config, distributions, estimator, measurement, metrics, plotting
+from . import (
+    config,
+    distributions,
+    estimator,
+    measurement,
+    metrics,
+    plotting,
+    propagator,
+)
 
 
 __all__ = [
@@ -8,4 +16,5 @@ __all__ = [
     "measurement",
     "metrics",
     "plotting",
+    "propagator",
 ]

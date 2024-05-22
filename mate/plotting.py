@@ -145,6 +145,8 @@ def _plot_post(
         plt.savefig(os.path.join(fig_dir, f"{title}{suffix}.{extension}"))
     if show:
         plt.show()
+    else:
+        plt.close()
 
 
 def plot_agents(agents, fovs, swap_axes=False, **kwds):
@@ -351,7 +353,7 @@ def plot_trust(
     for i_agent, (ID, color) in enumerate(
         zip(trust_estimator.agent_trust, agent_colors)
     ):
-        label = f"Agent {track.ID}"
+        label = f"Agent {ID}"
         ax.barh(
             y=i_agent,
             width=trust_estimator.agent_trust[ID].mean,

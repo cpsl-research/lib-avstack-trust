@@ -11,7 +11,7 @@ from avstack.config import MODELS, ConfigDict
 from avstack.modules.assignment import build_A_from_distance, gnn_single_frame_assign
 
 from .config import MATE
-from .distributions import TrustBetaParams
+from .distributions import TrustBetaDistribution
 
 
 @MATE.register_module()
@@ -19,29 +19,33 @@ class TrustEstimator:
     def __init__(
         self,
         Pd=0.9,
-        delta_m_factor=50,
-        delta_v_factor=0.05,
-        do_propagate=True,
         prior_agents={},
         prior_tracks={},
-        propagation_model: str = "uncertainty",
+        agent_propagator: ConfigDict = {
+            "type": "PriorInterpolationPropagator",
+            "prior": {"type": "TrustBetaDistribution", "alpha": 0.5, "beta": 0.5},
+            "w_prior": 0.1,
+        },
+        track_propagator: ConfigDict = {
+            "type": "PriorInterpolationPropagator",
+            "prior": {"type": "TrustBetaDistribution", "alpha": 0.5, "beta": 0.5},
+            "w_prior": 0.1,
+        },
         clusterer: ConfigDict = {
             "type": "SampledAssignmentClusterer",
-            "assign_radius": 1.0,
+            "assign_radius": 1.5,
         },
         psm: ConfigDict = {
             "type": "ViewBasedPsm",
-            "assign_radius": 1.0,
+            "assign_radius": 1.5,
         },
-        assign_radius: float = 1.0,
+        assign_radius: float = 1.5,
     ):
         self.Pd = Pd
         self.clusterer = MODELS.build(clusterer)
         self.psm = MATE.build(psm)
-        self.delta_m_factor = delta_m_factor
-        self.delta_v_factor = delta_v_factor
-        self.do_propagate = do_propagate
-        self._propagation_model = propagation_model
+        self.agent_propagator = MATE.build(agent_propagator)
+        self.track_propagator = MATE.build(track_propagator)
         self._prior_agents = prior_agents
         self._prior_tracks = prior_tracks
         self._prior_means = {"distrusted": 0.2, "untrusted": 0.5, "trusted": 0.8}
@@ -59,8 +63,8 @@ class TrustEstimator:
         tracks: Dict[int, "DataContainer"],
         agent_tracks: Dict[int, "DataContainer"],
     ):
-        if self.do_propagate:
-            self.propagate()
+        # -- run propagation
+        self.propagate()
 
         # -- initialize new distributions
         self.tracks = tracks
@@ -88,7 +92,7 @@ class TrustEstimator:
         precision = prior["strength"]
         alpha = mean * precision
         beta = (1 - mean) * precision
-        return TrustBetaParams(alpha, beta)
+        return TrustBetaDistribution(alpha, beta)
 
     def init_new_agents(self, agents, fovs):
         for i_agent in fovs:
@@ -106,44 +110,21 @@ class TrustEstimator:
                 )
                 self.track_trust[track.ID] = self.init_trust_distribution(prior)
 
-    def propagate(self, w_prior=0.2):
-        # Each frame we add some uncertainty
+    def propagate(self):
+        """Propagate agent and track trust distributions"""
+        for ID in self.agent_trust:
+            self.agent_propagator.propagate(self.agent_trust[ID])
         for ID in self.track_trust:
-            if self._propagation_model == "uncertainty":
-                # add variance
-                a = self.track_trust[ID].alpha
-                b = self.track_trust[ID].beta
-                m = a / (a + b)
-                v = a + b
-                m += (0.5 - m) / self.delta_m_factor
-                v += self.delta_v_factor
-                self.track_trust[ID].alpha = m * v
-                self.track_trust[ID].beta = (1 - m) * v
-            elif self._propagation_model == "prior":
-                w = w_prior
-                prior = self.init_trust_distribution(
-                    self._prior_tracks.get(ID, {"type": "untrusted", "strength": 1})
-                )
-                self.track_trust[ID].alpha = (1 - w) * self.track_trust[
-                    ID
-                ].alpha + w * prior.alpha
-                self.track_trust[ID].beta = (1 - w) * self.track_trust[
-                    ID
-                ].beta + w * prior.beta
-            elif self._propagation_model == "normalize":
-                # perform a heuristic normalization on params
-                s = (self.track_trust[ID].alpha + self.track_trust[ID].beta) / 2
-                self.track_trust[ID].alpha /= s
-                self.track_trust[ID].beta /= s
-            else:
-                raise NotImplementedError
+            self.track_propagator.propagate(self.track_trust[ID])
 
     def update_track_trust(self, agents, fovs, dets, tracks):
         # cluster the detections
         clusters = self.clusterer(dets, frame=0, timestamp=0)
 
         # assign clusters to existing tracks for IDs
-        A = build_A_from_distance(clusters, tracks)
+        A = build_A_from_distance(
+            [c.centroid()[:2] for c in clusters], [t.x[:2] for t in tracks]
+        )
         assign = gnn_single_frame_assign(A, cost_threshold=self.assign_radius)
 
         # update the parameters from psms
