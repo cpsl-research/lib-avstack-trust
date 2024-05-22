@@ -1,11 +1,20 @@
-from . import connectives, distribution, estimate, measurement, pipeline, state
+from . import (
+    config,
+    distributions,
+    estimator,
+    measurement,
+    metrics,
+    plotting,
+    propagator,
+)
 
 
 __all__ = [
-    "connectives",
-    "distribution",
-    "estimate",
+    "config",
+    "distributions",
+    "estimator",
     "measurement",
-    "pipeline",
-    "state",
+    "metrics",
+    "plotting",
+    "propagator",
 ]
