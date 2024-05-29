@@ -120,9 +120,9 @@ class TrustEstimator:
         for ID in self.track_trust:
             self.track_propagator.propagate(self.track_trust[ID])
 
-    def update_track_trust(self, agents, fovs, dets, tracks):
+    def update_track_trust(self, agents, fovs, agent_tracks, tracks):
         # cluster the detections
-        clusters = self.clusterer(dets, frame=0, timestamp=0)
+        clusters = self.clusterer(agent_tracks, frame=0, timestamp=0)
 
         # assign clusters to existing tracks for IDs
         A = build_A_from_distance(
