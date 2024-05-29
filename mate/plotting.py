@@ -1,5 +1,6 @@
 import os
 
+import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import numpy as np
 from avstack.modules.assignment import build_A_from_distance, gnn_single_frame_assign
@@ -12,8 +13,17 @@ marker_large = 10
 marker_medium = 8
 marker_small = 5
 linewidth = 3
-agent_colors = "rgbmc"
+agent_colors = list(mcolors.TABLEAU_COLORS.keys())
+track_colors = list(mcolors.XKCD_COLORS.keys())
 det_markers = [str(i + 1) for i in range(len(agent_colors))]
+
+
+def get_agent_color(ID_agent):
+    return agent_colors[ID_agent % len(agent_colors)]
+
+
+def get_track_color(ID_track):
+    return track_colors[ID_track % len(track_colors)]
 
 
 def set_axes(ax):
@@ -25,23 +35,22 @@ def set_axes(ax):
 
 def _add_agents_fovs(ax, agents, fovs, swap_axes=False):
     idxs = [1, 0] if swap_axes else [0, 1]
-    for i, color in zip(fovs, agent_colors):
+    for ID_agent, fov in fovs.items():
+        color = get_agent_color(ID_agent)
         ax.plot(
-            *agents[i][idxs],
+            *agents[ID_agent][idxs],
             "*",
             markersize=marker_medium,
             color=color,
-            label=f"Agent {i}",
+            label=f"Agent {ID_agent}",
         )
         try:
             # for FOV as a shape
-            circle = plt.Circle(agents[i], fovs[i].radius, color=color, alpha=0.4)
+            circle = plt.Circle(agents[ID_agent], fov.radius, color=color, alpha=0.4)
             ax.add_patch(circle)
         except AttributeError:
             # for FOV as a hull
-            polygon = Polygon(
-                fovs[i][:, idxs], closed=True, facecolor=color, alpha=0.25
-            )
+            polygon = Polygon(fov[:, idxs], closed=True, facecolor=color, alpha=0.25)
             ax.add_patch(polygon)
     # if swap_axes:
     #     ax.invert_xaxis()
@@ -67,7 +76,8 @@ def _add_objects(ax, objects, swap_axes=False):
 
 def _add_detections(ax, dets, swap_axes=False):
     idxs = [1, 0] if swap_axes else [0, 1]
-    for i_agent, ds in dets.items():
+    for ID_agent, ds in dets.items():
+        color = get_agent_color(ID_agent)
         for j, det in enumerate(ds):
             try:
                 center = det.x
@@ -75,11 +85,11 @@ def _add_detections(ax, dets, swap_axes=False):
                 center = det.box.t
             ax.plot(
                 *center[idxs],
-                marker=det_markers[i_agent],
+                marker=det_markers[ID_agent],
                 markersize=marker_large + 4,
                 alpha=1,
-                color=agent_colors[i_agent],
-                label=f"Detection, Agent {i_agent}" if j == 0 else "",
+                color=color,
+                label=f"Detection, Agent {ID_agent}" if j == 0 else "",
             )
     return ax
 
@@ -160,7 +170,7 @@ def plot_agents_objects(agents, fovs, objects, fps, fns, swap_axes=False, **kwds
             *fp[1][idxs],
             "x",
             markersize=marker_medium,
-            color=agent_colors[fp[0]],
+            color=get_agent_color([fp[0]]),
             label="FP" if i == 0 else "",
         )
 
@@ -170,7 +180,7 @@ def plot_agents_objects(agents, fovs, objects, fps, fns, swap_axes=False, **kwds
             *objects[fn[1]][idxs],
             "+",
             markersize=marker_large,
-            color=agent_colors[fn[0]],
+            color=get_agent_color([fn[0]]),
             label="FN" if i == 0 else "",
         )
     set_axes(ax)
@@ -246,6 +256,7 @@ def plot_trust(
     fig, ax = _plot_preliminaries(figsize=(5, 4))
     x = np.linspace(0, 1.0, 10000)
     for i_track, track in enumerate(tracks_sorted):
+        t_color = get_track_color(track.ID)
         if assigns is not None:
             label = (
                 f"{track.ID}: True Object"
@@ -260,7 +271,9 @@ def plot_trust(
             trust_estimator.track_trust[track.ID].alpha,
             trust_estimator.track_trust[track.ID].beta,
         )
-        ax.plot(x, y, linewidth=linewidth, linestyle=linestyle, label=label)
+        ax.plot(
+            x, y, color=t_color, linewidth=linewidth, linestyle=linestyle, label=label
+        )
 
     if use_labellines:
         lines = ax.get_lines()
@@ -291,20 +304,21 @@ def plot_trust(
     # plot all agent trust distributions
     fig, ax = _plot_preliminaries(figsize=(5, 4))
     x = np.linspace(0, 1.0, 10000)
-    for ID, color in zip(trust_estimator.agent_trust, agent_colors):
+    for ID_agent in trust_estimator.agent_trust:
+        a_color = get_agent_color(ID_agent)
         y = beta.pdf(
             x,
-            trust_estimator.agent_trust[ID].alpha,
-            trust_estimator.agent_trust[ID].beta,
+            trust_estimator.agent_trust[ID_agent].alpha,
+            trust_estimator.agent_trust[ID_agent].beta,
         )
         ax.plot(
             x,
             y,
-            color=color,
+            color=a_color,
             alpha=0.5,
             linewidth=linewidth,
             linestyle="--",
-            label=f"Agent {ID}",
+            label=f"Agent {ID_agent}",
         )
 
     ax.set_xlim([0, 1.0])
@@ -321,6 +335,7 @@ def plot_trust(
     # plot track trusts in bar format
     fig, ax = _plot_preliminaries(figsize=(5, 4))
     for i_track, track in enumerate(tracks_sorted):
+        t_color = get_track_color(track.ID)
         if assigns is not None:
             label = (
                 f"{track.ID}: True Object"
@@ -340,6 +355,7 @@ def plot_trust(
             xerr=np.array([[mean - x_below], [x_above - mean]]),
             capsize=4,
             label=label,
+            color=t_color,
         )
     ax.set_xlim([0, 1.0])
     ax.set_xlabel("Track Trust Score")
@@ -353,18 +369,17 @@ def plot_trust(
 
     # plot agent trusts in bar format
     fig, ax = _plot_preliminaries(figsize=(5, 4))
-    for i_agent, (ID, color) in enumerate(
-        zip(trust_estimator.agent_trust, agent_colors)
-    ):
-        label = f"Agent {ID}"
-        a = trust_estimator.agent_trust[ID].alpha
-        b = trust_estimator.agent_trust[ID].beta
-        mean = trust_estimator.agent_trust[ID].mean
+    for i_agent, ID_agent in enumerate(trust_estimator.agent_trust):
+        label = f"Agent {ID_agent}"
+        color = get_agent_color(ID_agent)
+        a = trust_estimator.agent_trust[ID_agent].alpha
+        b = trust_estimator.agent_trust[ID_agent].beta
+        mean = trust_estimator.agent_trust[ID_agent].mean
         x_below = beta.ppf(0.025, a, b)
         x_above = beta.ppf(0.975, a, b)
         ax.barh(
             y=i_agent,
-            width=trust_estimator.agent_trust[ID].mean,
+            width=trust_estimator.agent_trust[ID_agent].mean,
             xerr=np.array([[mean - x_below], [x_above - mean]]),
             capsize=7,
             label=label,
@@ -374,7 +389,9 @@ def plot_trust(
     ax.set_xlabel("Agent Trust Score")
     ax.set_ylabel("PDF")
     ax.set_yticks(list(range(len(trust_estimator.agent_trust))))
-    ax.set_yticklabels([f"Agent {ID}" for ID in trust_estimator.agent_trust])
+    ax.set_yticklabels(
+        [f"Agent {ID_agent}" for ID_agent in trust_estimator.agent_trust]
+    )
     ax.set_title("Agent Trusts")
     title = "experiment_agent_trusts_bar"
     subfig_dir = "agent_trust_bar" if use_subfolders else ""

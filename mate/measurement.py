@@ -46,10 +46,13 @@ class PsmGenerator:
 class ViewBasedPsm(PsmGenerator):
     """Simple overlap-based PSM function from CDC submission"""
 
-    def __init__(self, assign_radius: float = 1.0, min_prec: float = 0.0) -> None:
+    def __init__(
+        self, assign_radius: float = 1.0, min_prec: float = 0.0, verbose: bool = False
+    ) -> None:
         super().__init__()
         self.assign_radius = assign_radius
         self.min_prec = min_prec
+        self.verbose = verbose
 
     def psm_agents(self, fovs, tracks_agents, tracks, track_trust):
         """Obtains PSMs for all agents"""
@@ -161,7 +164,10 @@ class ViewBasedPsm(PsmGenerator):
                 if saw:  # positive result
                     dets = cluster.get_objects_by_agent_ID(i_agent)
                     if len(dets) > 1:
-                        logging.warning("Clustered more than one detection to track...")
+                        if self.verbose:
+                            logging.warning(
+                                "Clustered more than one detection to track..."
+                            )
                     psm = PSM(value=1.0, confidence=agent_trusts[i_agent].mean)
                 else:  # negative result
                     psm = PSM(value=0.0, confidence=agent_trusts[i_agent].mean)
