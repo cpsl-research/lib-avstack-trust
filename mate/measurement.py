@@ -105,7 +105,7 @@ class ViewBasedPsm(PsmGenerator):
             if points_in_fov(tracks[j_trk_central].x[:2], fov):
                 ID_central = tracks[j_trk_central].ID
                 if track_trust[ID_central].precision > self.min_prec:
-                    value = track_trust[ID_central].mean
+                    value = 1 - track_trust[ID_central].mean
                     confidence = 1 - track_trust[ID_central].variance
                     psms.append(PSM(value=value, confidence=confidence))
                 else:
