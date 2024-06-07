@@ -49,7 +49,7 @@ class TrustEstimator:
         self._prior_agents = prior_agents
         self._prior_tracks = prior_tracks
         self._prior_means = {"distrusted": 0.2, "untrusted": 0.5, "trusted": 0.8}
-        self.tracks = []
+        self.cc_tracks = []
         self.agent_trust = {}
         self.track_trust = {}
         self._inactive_track_trust = {}
@@ -57,35 +57,35 @@ class TrustEstimator:
 
     def __call__(
         self,
-        agents: Dict[int, np.ndarray],
-        fovs: Dict[int, Union["Shape", np.ndarray]],
-        dets: Dict[int, "DataContainer"],
-        tracks: Dict[int, "DataContainer"],
+        agent_poses: Dict[int, np.ndarray],
+        agent_fovs: Dict[int, Union["Shape", np.ndarray]],
+        agent_dets: Dict[int, "DataContainer"],
         agent_tracks: Dict[int, "DataContainer"],
+        cc_tracks: Dict[int, "DataContainer"],
     ):
         # -- run propagation
         self.propagate()
 
         # -- initialize new distributions
-        self.tracks = tracks
-        self.init_new_agents(agents, fovs)
-        self.init_new_tracks(tracks)
+        self.cc_tracks = cc_tracks
+        self.init_new_agents(agent_poses, agent_fovs)
+        self.init_new_tracks(cc_tracks)
 
         # -- prune old distributions
-        track_IDs = [track.ID for track in tracks]
+        cc_track_IDs = [track.ID for track in cc_tracks]
         # convert keys to list to handle popping during looping
         for track_trust_ID in list(self.track_trust.keys()):
-            if track_trust_ID not in track_IDs:
+            if track_trust_ID not in cc_track_IDs:
                 self._inactive_track_trust = self.track_trust[track_trust_ID]
                 self.track_trust.pop(track_trust_ID)
 
         # -- update agent trust
-        psms_agents = self.update_agent_trust(fovs, agent_tracks, tracks)
+        psms_agents = self.update_agent_trust(agent_fovs, agent_tracks, cc_tracks)
 
         # -- update object trust
         # psms_tracks, clusters = self.update_track_trust(agents, fovs, dets, tracks)
         psms_tracks, clusters = self.update_track_trust(
-            agents, fovs, agent_tracks, tracks
+            agent_poses, agent_fovs, agent_tracks, cc_tracks
         )
 
         return clusters, psms_agents, psms_tracks
@@ -97,7 +97,7 @@ class TrustEstimator:
         beta = (1 - mean) * precision
         return TrustBetaDistribution(alpha, beta)
 
-    def init_new_agents(self, agents, fovs):
+    def init_new_agents(self, agent_poses, fovs):
         for i_agent in fovs:
             if i_agent not in self.agent_trust:
                 prior = self._prior_agents.get(
