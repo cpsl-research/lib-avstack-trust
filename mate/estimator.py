@@ -1,3 +1,4 @@
+import os
 from typing import TYPE_CHECKING, Dict, Union
 
 import numpy as np
@@ -12,6 +13,7 @@ from avstack.modules.assignment import build_A_from_distance, gnn_single_frame_a
 
 from .config import MATE
 from .distributions import TrustBetaDistribution
+from .utils import BetaDistWriter, PsmWriter
 
 
 @MATE.register_module()
@@ -40,6 +42,7 @@ class TrustEstimator:
             "assign_radius": 1.5,
         },
         assign_radius: float = 1.5,
+        log_dir: str = "last_run",
     ):
         self.Pd = Pd
         self.clusterer = MODELS.build(clusterer)
@@ -55,8 +58,26 @@ class TrustEstimator:
         self._inactive_track_trust = {}
         self.assign_radius = assign_radius
 
+        # -- set up logging
+        os.makedirs(log_dir, exist_ok=True)
+        # psm logging
+        self.psm_agent_file = os.path.join(log_dir, "psm_agent_log.txt")
+        self.psm_track_file = os.path.join(log_dir, "psm_track_log.txt")
+        # trust dist logging
+        self.trust_agent_file = os.path.join(log_dir, "trust_agent_log.txt")
+        self.trust_track_file = os.path.join(log_dir, "trust_track_log.txt")
+        # wipe the logs
+        for file in [
+            self.psm_agent_file,
+            self.psm_track_file,
+            self.trust_agent_file,
+            self.trust_track_file,
+        ]:
+            open(file, "w").close()
+
     def __call__(
         self,
+        frame: int,
         agent_poses: Dict[int, np.ndarray],
         agent_fovs: Dict[int, Union["Shape", np.ndarray]],
         agent_dets: Dict[int, "DataContainer"],
@@ -87,6 +108,12 @@ class TrustEstimator:
         psms_tracks, clusters = self.update_track_trust(
             agent_poses, agent_fovs, agent_tracks, cc_tracks
         )
+
+        # log results
+        PsmWriter.write(frame, psms_agents, self.psm_agent_file)
+        PsmWriter.write(frame, psms_tracks, self.psm_track_file)
+        BetaDistWriter.write(frame, self.agent_trust, self.trust_agent_file)
+        BetaDistWriter.write(frame, self.track_trust, self.trust_track_file)
 
         return clusters, psms_agents, psms_tracks
 

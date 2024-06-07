@@ -28,7 +28,7 @@ def get_track_color(ID_track):
 
 def set_axes(ax):
     ax.set_aspect("equal", adjustable="box")
-    plt.legend()
+    plt.legend(loc="lower left")
     plt.axis("off")
     plt.tight_layout()
 
@@ -50,7 +50,9 @@ def _add_agents_fovs(ax, agents, fovs, swap_axes=False):
             ax.add_patch(circle)
         except AttributeError:
             # for FOV as a hull
-            polygon = Polygon(fov[:, idxs], closed=True, facecolor=color, alpha=0.25)
+            polygon = Polygon(
+                fov.boundary[:, idxs], closed=True, facecolor=color, alpha=0.25
+            )
             ax.add_patch(polygon)
     # if swap_axes:
     #     ax.invert_xaxis()
@@ -236,14 +238,16 @@ def plot_agents_tracks(
 
 
 def plot_trust(
-    trust_estimator,
+    tracks,
+    track_trust,
+    agent_trust,
     objects=None,
     show_legend=False,
     use_labellines=False,
     use_subfolders=False,
     **kwds,
 ):
-    tracks_sorted = sorted(trust_estimator.tracks, key=lambda x: x.ID, reverse=False)
+    tracks_sorted = sorted(tracks, key=lambda x: x.ID, reverse=False)
 
     # assign last tracks to truths, if possible
     if objects is not None:
@@ -268,8 +272,8 @@ def plot_trust(
         linestyle = "-" if "True" in label else "--"
         y = beta.pdf(
             x,
-            trust_estimator.track_trust[track.ID].alpha,
-            trust_estimator.track_trust[track.ID].beta,
+            track_trust[track.ID].alpha,
+            track_trust[track.ID].beta,
         )
         ax.plot(
             x, y, color=t_color, linewidth=linewidth, linestyle=linestyle, label=label
@@ -304,12 +308,12 @@ def plot_trust(
     # plot all agent trust distributions
     fig, ax = _plot_preliminaries(figsize=(5, 4))
     x = np.linspace(0, 1.0, 10000)
-    for ID_agent in trust_estimator.agent_trust:
+    for ID_agent in agent_trust:
         a_color = get_agent_color(ID_agent)
         y = beta.pdf(
             x,
-            trust_estimator.agent_trust[ID_agent].alpha,
-            trust_estimator.agent_trust[ID_agent].beta,
+            agent_trust[ID_agent].alpha,
+            agent_trust[ID_agent].beta,
         )
         ax.plot(
             x,
@@ -344,9 +348,9 @@ def plot_trust(
             )
         else:
             label = f"Track {track.ID}"
-        a = trust_estimator.track_trust[track.ID].alpha
-        b = trust_estimator.track_trust[track.ID].beta
-        mean = trust_estimator.track_trust[track.ID].mean
+        a = track_trust[track.ID].alpha
+        b = track_trust[track.ID].beta
+        mean = track_trust[track.ID].mean
         x_below = beta.ppf(0.025, a, b)
         x_above = beta.ppf(0.975, a, b)
         ax.barh(
@@ -360,7 +364,7 @@ def plot_trust(
     ax.set_xlim([0, 1.0])
     ax.set_xlabel("Track Trust Score")
     ax.set_ylabel("PDF")
-    ax.set_yticks(list(range(len(trust_estimator.tracks))))
+    ax.set_yticks(list(range(len(tracks))))
     ax.set_yticklabels([f"Track {track.ID}" for track in tracks_sorted])
     ax.set_title("Track Trusts")
     title = "experiment_track_trusts_bar"
@@ -369,17 +373,17 @@ def plot_trust(
 
     # plot agent trusts in bar format
     fig, ax = _plot_preliminaries(figsize=(5, 4))
-    for i_agent, ID_agent in enumerate(trust_estimator.agent_trust):
+    for i_agent, ID_agent in enumerate(agent_trust):
         label = f"Agent {ID_agent}"
         color = get_agent_color(ID_agent)
-        a = trust_estimator.agent_trust[ID_agent].alpha
-        b = trust_estimator.agent_trust[ID_agent].beta
-        mean = trust_estimator.agent_trust[ID_agent].mean
+        a = agent_trust[ID_agent].alpha
+        b = agent_trust[ID_agent].beta
+        mean = agent_trust[ID_agent].mean
         x_below = beta.ppf(0.025, a, b)
         x_above = beta.ppf(0.975, a, b)
         ax.barh(
             y=i_agent,
-            width=trust_estimator.agent_trust[ID_agent].mean,
+            width=agent_trust[ID_agent].mean,
             xerr=np.array([[mean - x_below], [x_above - mean]]),
             capsize=7,
             label=label,
@@ -388,10 +392,8 @@ def plot_trust(
     ax.set_xlim([0, 1.0])
     ax.set_xlabel("Agent Trust Score")
     ax.set_ylabel("PDF")
-    ax.set_yticks(list(range(len(trust_estimator.agent_trust))))
-    ax.set_yticklabels(
-        [f"Agent {ID_agent}" for ID_agent in trust_estimator.agent_trust]
-    )
+    ax.set_yticks(list(range(len(agent_trust))))
+    ax.set_yticklabels([f"Agent {ID_agent}" for ID_agent in agent_trust])
     ax.set_title("Agent Trusts")
     title = "experiment_agent_trusts_bar"
     subfig_dir = "agent_trust_bar" if use_subfolders else ""
