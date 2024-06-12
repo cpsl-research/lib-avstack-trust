@@ -1,3 +1,4 @@
+import json
 import os
 from typing import TYPE_CHECKING, Dict, Union
 
@@ -9,15 +10,70 @@ if TYPE_CHECKING:
     from avstack.datastructs import DataContainer
 
 from avstack.config import MODELS, ConfigDict
+from avstack.modules import BaseModule
 from avstack.modules.assignment import build_A_from_distance, gnn_single_frame_assign
+from avstack.utils.decorators import apply_hooks
 
 from .config import MATE
-from .distributions import TrustBetaDistribution
+from .distributions import TrustBetaDistribution, TrustDistDecoder
 from .utils import BetaDistWriter, PsmWriter
 
 
+class TrustMessageEncoder(json.JSONEncoder):
+    def default(self, o):
+        if isinstance(o, TrustMessage):
+            trust_dict = {
+                "agent_trust": {
+                    ID: trust.encode() for ID, trust in o.agent_trust.items()
+                },
+                "track_trust": {
+                    ID: trust.encode() for ID, trust in o.track_trust.items()
+                },
+                "frame": o.frame,
+                "timestamp": o.timestamp,
+            }
+            return {"trust": trust_dict}
+        else:
+            raise NotImplementedError(f"{type(o)}, {o}")
+
+
+class TrustMessageDecoder(json.JSONDecoder):
+    def __init__(self, *args, **kwargs):
+        json.JSONDecoder.__init__(self, object_hook=self.object_hook, *args, **kwargs)
+
+    @staticmethod
+    def object_hook(json_object):
+        if "trust" in json_object:
+            json_object = json_object["trust"]
+            return TrustMessage(
+                frame=int(json_object["frame"]),
+                timestamp=float(json_object["timestamp"]),
+                agent_trust={
+                    int(ID): json.loads(trust, cls=TrustDistDecoder)
+                    for ID, trust in json_object["agent_trust"].items()
+                },
+                track_trust={
+                    int(ID): json.loads(trust, cls=TrustDistDecoder)
+                    for ID, trust in json_object["track_trust"].items()
+                },
+            )
+        else:
+            return json_object
+
+
+class TrustMessage:
+    def __init__(self, frame, timestamp, agent_trust, track_trust):
+        self.frame = frame
+        self.timestamp = timestamp
+        self.agent_trust = agent_trust
+        self.track_trust = track_trust
+
+    def encode(self):
+        return json.dumps(self, cls=TrustMessageEncoder)
+
+
 @MATE.register_module()
-class TrustEstimator:
+class TrustEstimator(BaseModule):
     def __init__(
         self,
         Pd=0.9,
@@ -43,7 +99,11 @@ class TrustEstimator:
         },
         assign_radius: float = 1.5,
         log_dir: str = "last_run",
+        name: str = "trustestimator",
+        *args,
+        **kwargs,
     ):
+        super().__init__(name=name, *args, **kwargs)
         self.Pd = Pd
         self.clusterer = MODELS.build(clusterer)
         self.psm = MATE.build(psm)
@@ -75,9 +135,11 @@ class TrustEstimator:
         ]:
             open(file, "w").close()
 
+    @apply_hooks
     def __call__(
         self,
         frame: int,
+        timestamp: float,
         agent_poses: Dict[int, np.ndarray],
         agent_fovs: Dict[int, Union["Shape", np.ndarray]],
         agent_dets: Dict[int, "DataContainer"],
@@ -115,7 +177,12 @@ class TrustEstimator:
         BetaDistWriter.write(frame, self.agent_trust, self.trust_agent_file)
         BetaDistWriter.write(frame, self.track_trust, self.trust_track_file)
 
-        return clusters, psms_agents, psms_tracks
+        return TrustMessage(
+            frame=frame,
+            timestamp=timestamp,
+            agent_trust=self.agent_trust,
+            track_trust=self.track_trust,
+        )
 
     def init_trust_distribution(self, prior):
         mean = self._prior_means[prior["type"]]

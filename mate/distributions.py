@@ -1,3 +1,4 @@
+import json
 from typing import TYPE_CHECKING
 
 
@@ -9,10 +10,41 @@ import math
 from mate.config import MATE
 
 
+class TrustDistEncoder(json.JSONEncoder):
+    def default(self, o):
+        if isinstance(o, TrustBetaDistribution):
+            trust_dict = {
+                "alpha": o.alpha,
+                "beta": o.beta,
+            }
+            return {"trustbetadist": trust_dict}
+        else:
+            raise NotImplementedError(f"{type(o)}, {o}")
+
+
+class TrustDistDecoder(json.JSONDecoder):
+    def __init__(self, *args, **kwargs):
+        json.JSONDecoder.__init__(self, object_hook=self.object_hook, *args, **kwargs)
+
+    @staticmethod
+    def object_hook(json_object):
+        if "trustbetadist" in json_object:
+            json_object = json_object["trustbetadist"]
+            return TrustBetaDistribution(
+                alpha=json_object["alpha"],
+                beta=json_object["beta"],
+            )
+        else:
+            return json_object
+
+
 class TrustDistribution:
     @property
     def std(self):
         return math.sqrt(self.variance)
+
+    def encode(self):
+        return json.dumps(self, cls=TrustDistEncoder)
 
     def update(self, psm: "PSM"):
         raise NotImplementedError

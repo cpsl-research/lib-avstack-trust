@@ -113,9 +113,15 @@ def _add_clusters(ax, clusters, swap_axes=False):
 
 
 def _add_tracks(ax, tracks, swap_axes=False):
-    idxs = [1, 0] if swap_axes else [0, 1]
     for j, track in enumerate(tracks):
-        pos = track.position.x[idxs]
+        try:
+            # avstack tracks
+            idxs = [1, 0] if swap_axes else [0, 1]
+            pos = track.position.x[idxs]
+        except AttributeError:
+            # stonesoup tracks
+            idxs = [2, 0] if swap_axes else [0, 2]
+            pos = track.state_vector[idxs]
         ax.plot(
             *pos,
             "x",
