@@ -214,19 +214,19 @@ class TrustEstimator(BaseModule):
         for ID in self.track_trust:
             self.track_propagator.propagate(self.track_trust[ID])
 
-    def update_track_trust(self, agents, fovs, agent_tracks, tracks):
+    def update_track_trust(self, agents, fovs, agent_tracks, cc_tracks):
         # cluster the detections
         clusters = self.clusterer(agent_tracks, frame=0, timestamp=0)
 
         # assign clusters to existing tracks for IDs
         A = build_A_from_distance(
-            [c.centroid()[:2] for c in clusters], [t.x[:2] for t in tracks]
+            [c.centroid()[:2] for c in clusters], [t.x[:2] for t in cc_tracks]
         )
         assign = gnn_single_frame_assign(A, cost_threshold=self.assign_radius)
 
         # update the parameters from psms
         psms_tracks = self.psm.psm_tracks(
-            agents, fovs, self.agent_trust, clusters, tracks, assign
+            agents, fovs, self.agent_trust, clusters, cc_tracks, assign
         )
         for ID_track, psms in psms_tracks.items():
             for psm in psms:
@@ -234,9 +234,11 @@ class TrustEstimator(BaseModule):
 
         return psms_tracks, clusters
 
-    def update_agent_trust(self, fovs, tracks_agent, tracks):
+    def update_agent_trust(self, fovs, tracks_agent, cc_tracks):
         # update the parameters from psms
-        psms_agents = self.psm.psm_agents(fovs, tracks_agent, tracks, self.track_trust)
+        psms_agents = self.psm.psm_agents(
+            fovs, tracks_agent, cc_tracks, self.track_trust
+        )
         for i_agent, psms in psms_agents.items():
             for psm in psms:
                 self.agent_trust[i_agent].update(psm)

@@ -113,16 +113,16 @@ class ViewBasedPsm(PsmGenerator):
 
         return psms
 
-    def psm_tracks(self, agents, fovs, agent_trust, clusters, tracks, assign):
+    def psm_tracks(self, agents, fovs, agent_trust, clusters, cc_tracks, assign):
         """Obtains PSMs for all tracks"""
-        psms_tracks = {track.ID: [] for track in tracks}  # this is unnecessary
+        psms_tracks = {track.ID: [] for track in cc_tracks}  # this is unnecessary
 
         # assignments - run pseudomeasurement generation
         for j_clust, i_track in assign.iterate_over("rows", with_cost=False).items():
             i_track = i_track[0]  # one edge only
-            ID_track = tracks[i_track].ID
+            ID_track = cc_tracks[i_track].ID
             psms_tracks[ID_track] = self.psm_track_assigned(
-                agents, fovs, agent_trust, clusters[j_clust], tracks[i_track]
+                agents, fovs, agent_trust, clusters[j_clust], cc_tracks[i_track]
             )
 
         # ***enforce constraint on number of updates***
@@ -140,9 +140,9 @@ class ViewBasedPsm(PsmGenerator):
 
         # lone tracks - penalize because of no detections (if in view)
         for i_track in assign.unassigned_cols:
-            ID_track = tracks[i_track].ID
+            ID_track = cc_tracks[i_track].ID
             psms_tracks[ID_track] = self.psm_track_unassigned(
-                agents, fovs, agent_trust, tracks[i_track]
+                agents, fovs, agent_trust, cc_tracks[i_track]
             )
 
         return psms_tracks
@@ -153,12 +153,13 @@ class ViewBasedPsm(PsmGenerator):
         fovs: Dict[int, Union["Shape", np.ndarray]],
         agent_trusts: Dict[int, TrustDistribution],
         cluster: "Cluster",
-        track: "TrackBase",
+        cc_track: "TrackBase",
+        d_thresh_self: float = 1.0,
     ):
         """Creates PSMs for one track"""
         psms = []
         for i_agent in fovs:
-            if points_in_fov(track.x[:2], fovs[i_agent]):
+            if points_in_fov(cc_track.x[:2], fovs[i_agent]):
                 # Get the PSM
                 saw = i_agent in cluster.agent_IDs  # did this agent see it?
                 if saw:  # positive result
@@ -170,7 +171,14 @@ class ViewBasedPsm(PsmGenerator):
                             )
                     psm = PSM(value=1.0, confidence=agent_trusts[i_agent].mean)
                 else:  # negative result
-                    psm = PSM(value=0.0, confidence=agent_trusts[i_agent].mean)
+                    # Handle case where agent can't see itself
+                    if (
+                        np.linalg.norm(agents[i_agent].x[:3] - cc_track.x[:3])
+                        < d_thresh_self
+                    ):
+                        psm = PSM(value=1.0, confidence=1.0)
+                    else:
+                        psm = PSM(value=0.0, confidence=agent_trusts[i_agent].mean)
                 psms.append(psm)
         return psms
 
@@ -179,11 +187,11 @@ class ViewBasedPsm(PsmGenerator):
         agents: Dict[int, np.ndarray],
         fovs: Dict[int, Union["Shape", np.ndarray]],
         agent_trusts: Dict[int, TrustDistribution],
-        track: "TrackBase",
+        cc_track: "TrackBase",
     ):
         psms = []
         for i_agent in fovs:
-            if points_in_fov(track.x[:2], fovs[i_agent]):
+            if points_in_fov(cc_track.x[:2], fovs[i_agent]):
                 psm = PSM(value=0.0, confidence=agent_trusts[i_agent].mean)
                 psms.append(psm)
         return psms
