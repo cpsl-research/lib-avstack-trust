@@ -112,20 +112,28 @@ class TrustEstimator(BaseModule):
         self._prior_agents = prior_agents
         self._prior_tracks = prior_tracks
         self._prior_means = {"distrusted": 0.2, "untrusted": 0.5, "trusted": 0.8}
+        self.assign_radius = assign_radius
+        self.log_dir = log_dir
+
+        # set up data to track
+        self._set_data_structures()
+        self._set_log_file()
+
+    def _set_data_structures(self):
         self.cc_tracks = []
         self.agent_trust = {}
         self.track_trust = {}
         self._inactive_track_trust = {}
-        self.assign_radius = assign_radius
 
+    def _set_log_file(self):
         # -- set up logging
-        os.makedirs(log_dir, exist_ok=True)
+        os.makedirs(self.log_dir, exist_ok=True)
         # psm logging
-        self.psm_agent_file = os.path.join(log_dir, "psm_agent_log.txt")
-        self.psm_track_file = os.path.join(log_dir, "psm_track_log.txt")
+        self.psm_agent_file = os.path.join(self.log_dir, "psm_agent_log.txt")
+        self.psm_track_file = os.path.join(self.log_dir, "psm_track_log.txt")
         # trust dist logging
-        self.trust_agent_file = os.path.join(log_dir, "trust_agent_log.txt")
-        self.trust_track_file = os.path.join(log_dir, "trust_track_log.txt")
+        self.trust_agent_file = os.path.join(self.log_dir, "trust_agent_log.txt")
+        self.trust_track_file = os.path.join(self.log_dir, "trust_track_log.txt")
         # wipe the logs
         for file in [
             self.psm_agent_file,
@@ -135,6 +143,10 @@ class TrustEstimator(BaseModule):
         ]:
             open(file, "w").close()
 
+    def reset(self):
+        self._set_data_structures()
+        self._set_log_file()
+
     @apply_hooks
     def __call__(
         self,
@@ -142,9 +154,10 @@ class TrustEstimator(BaseModule):
         timestamp: float,
         agent_poses: Dict[int, np.ndarray],
         agent_fovs: Dict[int, Union["Shape", np.ndarray]],
-        agent_dets: Dict[int, "DataContainer"],
         agent_tracks: Dict[int, "DataContainer"],
-        cc_tracks: Dict[int, "DataContainer"],
+        cc_tracks: "DataContainer",
+        *args,
+        **kwargs,
     ):
         # -- run propagation
         self.propagate()
