@@ -17,6 +17,7 @@ python = "~3.10"
 pymc = "~5.10.4"
 PyQt5 = "=5.15.2"
 matplotlib-label-lines = "~0.7.0"
+matplotlib = "^3.9.0"
 # comment out when using as submodule
 # lib-avstack-core = { path = "third_party/lib-avstack-core", develop = true, extras = [] }
 

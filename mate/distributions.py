@@ -1,11 +1,11 @@
 import json
-from typing import TYPE_CHECKING
+import math
+from typing import TYPE_CHECKING, List
 
 
 if TYPE_CHECKING:
-    from .measurement import PSM
-
-import math
+    from .measurement import Psm
+    from .propagator import DistributionPropagator
 
 from mate.config import MATE
 
@@ -46,13 +46,15 @@ class TrustDistribution:
     def encode(self):
         return json.dumps(self, cls=TrustDistEncoder)
 
-    def update(self, psm: "PSM"):
+    def update(self, psm: "Psm"):
         raise NotImplementedError
 
 
 @MATE.register_module()
 class TrustBetaDistribution(TrustDistribution):
-    def __init__(self, alpha, beta):
+    def __init__(self, timestamp: float, identifier: str, alpha: float, beta: float):
+        self.timestamp = timestamp
+        self.identifier = identifier
         self.alpha = alpha
         self.beta = beta
 
@@ -81,6 +83,35 @@ class TrustBetaDistribution(TrustDistribution):
     def copy(self):
         return TrustBetaDistribution(self.alpha, self.beta)
 
-    def update(self, psm: "PSM"):
+    def update(self, psm: "Psm"):
         self.alpha += psm.confidence * psm.value
         self.beta += psm.confidence * (1 - psm.value)
+
+
+class TrustArray:
+    def __init__(self, timestamp: float, trusts: List[TrustDistribution]):
+        self.timestamp = timestamp
+        self.trusts = {tr.identifier: tr for tr in trusts}
+
+    def __iter__(self):
+        return iter(self.trusts)
+
+    def __getitem__(self, key: int) -> TrustDistribution:
+        return self.trusts[key]
+    
+    def __len__(self) -> int:
+        return len(self.psms)
+
+    def __repr__(self) -> str:
+        return self.__str__()
+
+    def __str__(self) -> str:
+        return f"TrustArray at time {self.timestamp}, {self.trusts}"
+
+    def append(self, other: "TrustDistribution"):
+        self.trusts[other.identifier] = other
+
+    def propagate(self, timestamp: float, propagator: "DistributionPropagator"):
+        for trust in self.trusts.values():
+            propagator.propagate(timestamp, trust)
+        self.timestamp = timestamp
