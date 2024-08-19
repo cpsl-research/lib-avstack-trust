@@ -1,40 +1,20 @@
-import numpy as np
-
-from mate import distribution
-
-
-def test_beta_basic():
-    alpha = 0.5
-    beta = 2.0
-    dist = distribution.Beta(alpha=alpha, beta=beta)
-    assert dist.mean == alpha / (alpha + beta)
-    assert dist.var == alpha * beta / ((alpha + beta) ** 2 * (alpha + beta + 1))
+from mate.distributions import TrustBetaDistribution
+from mate.measurement import Psm
 
 
-def test_beta_sample():
-    mean = 0.5
-    var = 0.1**2
-    dist = distribution.Beta(mean=mean, var=var)
-    samples = dist.rvs(n=10000)
-    assert abs(np.mean(samples) - mean) < 0.01
-    assert abs(np.std(samples) - np.sqrt(var)) < 0.01
+def test_copy_beta():
+    beta = TrustBetaDistribution(timestamp=0, identifier=0, alpha=1.0, beta=1.0)
+    b2 = beta.copy()
+    assert beta.alpha == b2.alpha
+    assert beta.beta == b2.beta
 
 
-def test_beta_fit():
-    alpha = 1.0
-    beta = 2.0
-    dist1 = distribution.Beta(alpha=alpha, beta=beta)
-    samples = dist1.rvs(n=100000, random_state=123)
-    dist2 = distribution.Beta.fit(samples)
-    assert abs(alpha - dist2.alpha) < 0.1 and abs(beta - dist2.beta) < 0.1
+def test_init_beta():
+    beta = TrustBetaDistribution(timestamp=0, identifier=0, alpha=1.0, beta=1.0)
 
 
-def test_uniform_basic():
-    a = 5.0
-    b = 6.5
-    dist = distribution.Uniform(a=a, b=b)
-    assert np.isclose(dist.mean, (a + b) / 2)
-    assert dist.pdf(a - 1.0) == 0.0
-    assert dist.cdf(a - 1.0) == 0.0
-    assert dist.cdf(b + 1.0) == 1.0
-    assert dist.pdf(a), 1 / (b - a)
+def test_update_beta():
+    beta = TrustBetaDistribution(timestamp=0, identifier=0, alpha=1.0, beta=1.0)
+    psm = Psm(timestamp=0.0, target=0, value=1.0, confidence=1.0, source=1)
+    beta.update(psm=psm)
+    assert beta.alpha > 1.0

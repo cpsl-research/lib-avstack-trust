@@ -45,7 +45,8 @@ class TrustUpdater:
     def _set_data_structures(self):
         self.trust_agents = TrustArray(timestamp=0.0, trusts=[])
         self.trust_tracks = TrustArray(timestamp=0.0, trusts=[])
-        self._inactive_track_trust = TrustArray(timestamp=0.0, trusts=[])
+        # self._inactive_agent_trust = TrustArray(timestamp=0.0, trusts=[])
+        # self._inactive_track_trust = TrustArray(timestamp=0.0, trusts=[])
 
     def reset(self):
         self._set_data_structures()
@@ -75,6 +76,10 @@ class TrustUpdater:
                 )
 
         # check for old agents
+        agent_keys = list(self.trust_agents.trusts.keys())
+        for i_agent in agent_keys:
+            if i_agent not in agent_ids:
+                self.trust_agents.remove(self.trust_agents[i_agent])
 
     def init_new_tracks(self, timestamp: float, track_ids: List[int]):
         # check for new tracks
@@ -88,6 +93,10 @@ class TrustUpdater:
                 )
 
         # check for old tracks
+        track_keys = list(self.trust_tracks.trusts.keys())
+        for i_track in track_keys:
+            if i_track not in track_ids:
+                self.trust_tracks.remove(self.trust_tracks[i_track])
 
     # ==========================================
     # propagators

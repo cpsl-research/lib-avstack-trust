@@ -57,12 +57,49 @@ class TrustBetaDistribution(TrustDistribution):
         self.identifier = identifier
         self.alpha = alpha
         self.beta = beta
+        self._t_last_update = timestamp
 
     def __repr__(self) -> str:
         return self.__str__()
 
     def __str__(self) -> str:
         return f"TrustBetaDistribution: ({self.alpha:5.2f}, {self.beta:5.2f})"
+
+    @property
+    def alpha(self):
+        return self._alpha
+
+    @alpha.setter
+    def alpha(self, alpha: float):
+        if alpha <= 0:
+            raise ValueError("Alpha must be larger than 0")
+        self._alpha = alpha
+
+    @property
+    def beta(self):
+        return self._beta
+
+    @beta.setter
+    def beta(self, beta: float):
+        if beta <= 0:
+            raise ValueError("Beta must be larger than 0")
+        self._beta = beta
+
+    @property
+    def a(self):
+        return self.alpha
+
+    @a.setter
+    def a(self, alpha):
+        self.alpha = alpha
+
+    @property
+    def b(self):
+        return self.beta
+
+    @b.setter
+    def b(self, beta):
+        self.beta = beta
 
     @property
     def mean(self):
@@ -73,6 +110,10 @@ class TrustBetaDistribution(TrustDistribution):
         return self.alpha + self.beta
 
     @property
+    def dt_last_update(self):
+        return self.timestamp - self._t_last_update
+
+    @property
     def variance(self):
         return (
             self.alpha
@@ -81,11 +122,21 @@ class TrustBetaDistribution(TrustDistribution):
         )
 
     def copy(self):
-        return TrustBetaDistribution(self.alpha, self.beta)
+        return TrustBetaDistribution(
+            timestamp=self.timestamp,
+            identifier=self.identifier,
+            alpha=self.alpha,
+            beta=self.beta,
+        )
 
     def update(self, psm: "Psm"):
+        if psm.target != self.identifier:
+            raise ValueError(
+                f"PSM {psm.target} target does not match trust identifier {self.identifier}"
+            )
         self.alpha += psm.confidence * psm.value
         self.beta += psm.confidence * (1 - psm.value)
+        self._t_last_update = psm.timestamp
 
 
 class TrustArray:
@@ -98,9 +149,9 @@ class TrustArray:
 
     def __getitem__(self, key: int) -> TrustDistribution:
         return self.trusts[key]
-    
+
     def __len__(self) -> int:
-        return len(self.psms)
+        return len(self.trusts)
 
     def __repr__(self) -> str:
         return self.__str__()
@@ -115,3 +166,6 @@ class TrustArray:
         for trust in self.trusts.values():
             propagator.propagate(timestamp, trust)
         self.timestamp = timestamp
+
+    def remove(self, other: "TrustDistribution"):
+        del self.trusts[other.identifier]

@@ -1,7 +1,7 @@
 NAME := mate
 INSTALL_STAMP := .install.stamp
 POETRY := $(shell command -v poetry 2> /dev/null)
-PYFOLDERS := mate tests analysis
+PYFOLDERS := mate tests
 .DEFAULT_GOAL := help
 
 .PHONY: help

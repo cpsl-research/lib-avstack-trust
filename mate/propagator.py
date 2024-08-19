@@ -10,39 +10,14 @@ from mate.distributions import TrustBetaDistribution, TrustDistribution
 class DistributionPropagator:
     def propagate(self, timestamp: float, dist: TrustDistribution):
         dt = timestamp - dist.timestamp
-        if dt > 0:
+        if dt < 0:
+            raise ValueError(f"Obtained a negative dt {dt}")
+        elif dt > 0:
             self._propagate(dt, dist)
         dist.timestamp = timestamp
 
     def _propagate(self, dt: float, dist: TrustDistribution):
         raise NotImplementedError
-
-
-@MATE.register_module()
-class UncertaintyPropagator(DistributionPropagator):
-    def __init__(self, delta_v: float = 0.05, v_min: float = 0, v_max: float = np.inf):
-        """Propagate the uncertainty of a trust distribution
-
-        Equation:
-        v = v + delta_v * dt
-
-        Args:
-            delta_v : increase in variance (units of 1/s)
-            v_min : minimum variance to allow
-            v_max : maximum variance to allow
-        """
-        self.delta_v = delta_v
-        self.v_min = v_min
-        self.v_max = v_max
-
-    def _propagate(self, dt: float, dist: TrustDistribution):
-        if isinstance(dist, TrustBetaDistribution):
-            m = dist.mean
-            v = min(self.v_max, max(self.v_min, dist.precision + self.delta_v * dt))
-            dist.a = m * v
-            dist.b = (1 - m) * v
-        else:
-            raise NotImplementedError(type(dist))
 
 
 @MATE.register_module()
@@ -68,9 +43,63 @@ class MeanPropagator(DistributionPropagator):
                 self.m_max,
                 max(self.m_min, dist.mean + (0.5 - dist.mean) / (self.factor_m * dt)),
             )
-            v = dist.precision
-            dist.a = m * v
-            dist.b = (1 - m) * v
+            p = dist.precision
+            dist.a = m * p
+            dist.b = (1 - m) * p
+        else:
+            raise NotImplementedError(type(dist))
+
+
+@MATE.register_module()
+class PrecisionPropagator(DistributionPropagator):
+    def __init__(self, delta_p: float = 0.05, p_min: float = 0, p_max: float = np.inf):
+        """Propagate the precision of a trust distribution
+
+        Equation:
+        p = p + delta_p * dt
+
+        Args:
+            delta_p : increase in precision (units of 1/s)
+            p_min : minimum precision to allow
+            p_max : maximum precision to allow
+        """
+        self.delta_p = delta_p
+        self.p_min = p_min
+        self.p_max = p_max
+
+    def _propagate(self, dt: float, dist: TrustDistribution):
+        if isinstance(dist, TrustBetaDistribution):
+            m = dist.mean
+            p = min(self.p_max, max(self.p_min, dist.precision + self.delta_p * dt))
+            dist.a = m * p
+            dist.b = (1 - m) * p
+        else:
+            raise NotImplementedError(type(dist))
+
+
+@MATE.register_module()
+class VariancePropagator(DistributionPropagator):
+    def __init__(self, delta_v: float = 0.05, v_min: float = 0, v_max: float = np.inf):
+        """Propagate the variance of a trust distribution
+
+        Equation:
+        v = v + delta_v * dt
+
+        Args:
+            delta_v : increase in variance (units of 1/s)
+            v_min : minimum variance to allow
+            v_max : maximum variance to allow
+        """
+        self.delta_v = delta_v
+        self.v_min = v_min
+        self.v_max = v_max
+
+    def _propagate(self, dt: float, dist: TrustDistribution):
+        if isinstance(dist, TrustBetaDistribution):
+            m = dist.mean
+            v = min(self.v_max, max(self.v_min, dist.variance + self.delta_v * dt))
+            dist.a = (m * (1 - m) / v - 1) * m
+            dist.b = (m * (1 - m) / v - 1) * (1 - m)
         else:
             raise NotImplementedError(type(dist))
 

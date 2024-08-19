@@ -1,16 +1,12 @@
-import logging
-from typing import TYPE_CHECKING, Dict, List, Union
+from typing import TYPE_CHECKING, Dict, List
 
 
 if TYPE_CHECKING:
     from avstack.datastructs import DataContainer
     from avstack.geometry import Position, Shape
-    from avstack.modules.clustering import Cluster
-    from avstack.modules.tracking import TrackBase
 
 import numpy as np
-from avstack.config import MODELS, ConfigDict
-from avstack.geometry.fov import points_in_fov
+from avstack.geometry.fov import box_in_fov
 from avstack.modules.assignment import build_A_from_distance, gnn_single_frame_assign
 
 from .config import MATE
@@ -52,7 +48,7 @@ class PsmArray:
 
     def __getitem__(self, key: int) -> Psm:
         return self.psms[key]
-    
+
     def __len__(self) -> int:
         return len(self.psms)
 
@@ -61,7 +57,7 @@ class PsmArray:
 
     def __str__(self) -> str:
         return f"PsmArray at time {self.timestamp}, {self.psms}"
-    
+
     def append(self, other: "Psm"):
         self.psms.append(other)
 
@@ -75,6 +71,45 @@ class PsmArray:
                 psms_target[psm.target] = PsmArray(self.timestamp, [])
             psms_target[psm.target].append(psm)
         return psms_target
+
+
+class PsmDiagnostics:
+    def __init__(self):
+        self.diag_agent = {}
+        self.diag_track = {}
+
+    def __getitem__(self, key: str):
+        if key == "agent":
+            return self.diag_agent
+        elif key == "track":
+            return self.diag_track
+        else:
+            raise KeyError(key)
+
+    def __setitem__(self, key, value):
+        if key == "agent":
+            self.diag_agent = value
+        elif key == "track":
+            self.diag_track = value
+        else:
+            raise KeyError(key)
+
+    def __repr__(self) -> str:
+        return self.__str__()
+
+    def __str__(self):
+        out_str = f"PSM Diagnostic Data Structure:\n"
+        for i, ident in enumerate(["Agent", "Track"]):
+            diag = self.diag_agent if i == 0 else self.diag_track
+            header = "-" * 12 + "\n" + " " * 5 + f"{ident} Diags:\n"
+            content = "\n".join(
+                [
+                    f"{ident} {d_ID}: [{', '.join([f'{d_k}: ' + d_v['identifier'] for d_k, d_v in diag[d_ID].items()])}]"
+                    for d_ID in diag
+                ]
+            )
+            out_str += header + content
+        return out_str
 
 
 class PsmGenerator:
@@ -93,221 +128,190 @@ class PsmGenerator:
 
 @MATE.register_module()
 class ViewBasedPsm(PsmGenerator):
-    """Simple overlap-based PSM function from CDC submission"""
+    """Simple overlap-based PSM function"""
 
-    def __init__(
-        self,
-        assign_radius: float = 1.0,
-        min_prec: float = 0.0,
-        clusterer: ConfigDict = {
-            "type": "SampledAssignmentClusterer",
-            "assign_radius": 1.5,
-        },
-        verbose: bool = False,
-    ) -> None:
-        super().__init__()
+    def __init__(self, assign_radius: float = 1.0, verbose: bool = False):
         self.assign_radius = assign_radius
-        self.min_prec = min_prec
-        self.clusterer = MODELS.build(clusterer)
         self.verbose = verbose
+        self._diagnostics = PsmDiagnostics()
+        self._assign_diagnostics = {}
 
-    def psms_agents(
+    def __call__(
         self,
+        position_agents: Dict[int, "Position"],
         fov_agents: Dict[int, "Shape"],
         tracks_agents: Dict[int, "DataContainer"],
         tracks_cc: "DataContainer",
+        trust_agents: Dict[int, TrustDistribution],
         trust_tracks: Dict[int, TrustDistribution],
+        d_self_thresh: float = 1.0,
     ):
-        """Obtains PSMs for all agents"""
+        # -- reset the diagnostics
+        self._diagnostics["agent"] = {
+            id_agent: {track.ID: {} for track in tracks_cc}
+            for id_agent in position_agents
+        }
+        self._diagnostics["track"] = {
+            track.ID: {id_agent: {} for id_agent in position_agents}
+            for track in tracks_cc
+        }
+        self._assign_diagnostics = {}
+
+        # -- allocate trust dict space
         psms_agents = PsmArray(timestamp=tracks_cc.timestamp, psms=[])
-        for i_agent in fov_agents:
-            psms_agents.extend(
-                self.psms_agent(
-                    i_agent=i_agent,
-                    fov_agent=fov_agents[i_agent],
-                    tracks_agent=tracks_agents[i_agent],
-                    tracks_cc=tracks_cc,
-                    trust_tracks=trust_tracks,
-                )
+        psms_tracks = PsmArray(timestamp=tracks_cc.timestamp, psms=[])
+
+        # -- perform agent-wise assignment
+        cc_tracks_pos = [t.x[:2] for t in tracks_cc]
+        timestamp = tracks_cc.timestamp
+        for i_agent in position_agents:
+            position_agent = position_agents[i_agent]
+            fov_agent = fov_agents[i_agent]
+
+            # -- assignment for this agent
+            A = build_A_from_distance(
+                [t.x[:2] for t in tracks_agents[i_agent]],
+                cc_tracks_pos,
+                check_reference=False,
             )
-        return psms_agents
+            assign = gnn_single_frame_assign(A, cost_threshold=self.assign_radius)
+            self._assign_diagnostics[i_agent] = A
 
-    def psms_agent(
-        self,
-        i_agent: int,
-        fov_agent: Union["Shape", np.ndarray],
-        tracks_agent: "DataContainer",
-        tracks_cc: "DataContainer",
-        trust_tracks: Dict[int, TrustDistribution],
-    ):
-        """Creates PSMs for one agent"""
-        # assign agent tracks to central tracks
-        A = build_A_from_distance(
-            [t.x[:2] for t in tracks_agent],
-            [t.x[:2] for t in tracks_cc],
-            check_reference=False,
-        )
-        assign = gnn_single_frame_assign(A, cost_threshold=self.assign_radius)
-        psms = []
+            # ===============================================
+            # -- PSMs for assignments
+            # ===============================================
 
-        # assignments provide psms proportional to track trust
-        for _, j_trk_central in assign.iterate_over("rows", with_cost=False).items():
-            j_trk_central = j_trk_central[0]  # assumes one assignment
-            ID_central = tracks_cc[j_trk_central].ID
-            if trust_tracks[ID_central].precision > self.min_prec:
-                value = trust_tracks[ID_central].mean
-                confidence = 1 - trust_tracks[ID_central].variance
-                psms.append(
+            for i_trk_agent, j_trk_central in assign.iterate_over(
+                "rows", with_cost=False
+            ).items():
+                # get ID of the central track
+                j_trk_central = j_trk_central[0]  # assumes one assignment
+                ID_central = tracks_cc[j_trk_central].ID
+
+                # -- agent PSM for assignment
+                psms_agents.append(
                     Psm(
-                        timestamp=tracks_cc.timestamp,
+                        timestamp=timestamp,
                         target=i_agent,
-                        value=value,
-                        confidence=confidence,
+                        value=trust_tracks[ID_central].mean,
+                        confidence=1 - trust_tracks[ID_central].variance,
                         source=ID_central,
                     )
                 )
-            else:
-                raise NotImplementedError()
+                self._diagnostics["agent"][i_agent][ID_central] = {
+                    "type": "assigned",
+                    "in_fov": True,
+                    "distance": A[i_trk_agent, j_trk_central],
+                    "track_is_agent": False,
+                    "identifier": "agent_assigned",
+                }
 
-        # tracks in local not in central are unclear...
-        for i_trk_agent in assign.unassigned_rows:
-            pass
+                # -- track PSM for assignment
+                psms_tracks.append(
+                    Psm(
+                        timestamp=timestamp,
+                        target=ID_central,
+                        value=1.0,
+                        confidence=trust_agents[i_agent].mean,
+                        source=i_agent,
+                    )
+                )
+                self._diagnostics["track"][ID_central][i_agent] = {
+                    "type": "assigned",
+                    "in_fov": True,
+                    "distance": A[i_trk_agent, j_trk_central],
+                    "track_is_agent": False,
+                    "identifier": "track_assigned",
+                }
 
-        # tracks in central not in local provide psms inversely proportional to trust
-        for j_trk_central in assign.unassigned_cols:
-            if points_in_fov(tracks_cc[j_trk_central].x[:2], fov_agent):
+            # ===============================================
+            # -- PSMs for local not in central
+            # ===============================================
+
+            # ===============================================
+            # -- PSMs for central not in local
+            # ===============================================
+
+            for j_trk_central in assign.unassigned_cols:
                 ID_central = tracks_cc[j_trk_central].ID
-                if trust_tracks[ID_central].precision > self.min_prec:
-                    value = 1 - trust_tracks[ID_central].mean
-                    confidence = 1 - trust_tracks[ID_central].variance
-                    psms.append(
+                track_central = tracks_cc[j_trk_central]
+                d_self = np.linalg.norm(position_agent.x[:3] - track_central.x[:3])
+                if d_self < d_self_thresh:
+                    # agent can't see itself - track improves, agent neutral
+                    self._diagnostics["agent"][i_agent][ID_central] = {
+                        "type": "unassigned",
+                        "in_fov": True,
+                        "distance": d_self,
+                        "track_is_agent": True,
+                        "identifier": "agent_central_track_is_agent",
+                    }
+                    psms_tracks.append(
                         Psm(
-                            timestamp=tracks_cc.timestamp,
-                            target=i_agent,
-                            value=value,
-                            confidence=confidence,
-                            source=ID_central,
+                            timestamp=timestamp,
+                            target=ID_central,
+                            value=1.0,
+                            confidence=1.0,
+                            source=i_agent,
                         )
                     )
+                    self._diagnostics["track"][ID_central][i_agent] = {
+                        "type": "unassigned",
+                        "in_fov": True,
+                        "distance": d_self,
+                        "track_is_agent": True,
+                        "identifier": "agent_central_track_is_agent",
+                    }
                 else:
-                    raise NotImplementedError()
-
-        return PsmArray(timestamp=tracks_cc.timestamp, psms=psms)
-
-    def psms_tracks(
-        self,
-        position_agents: Dict[int, "Position"],
-        fov_agents: Dict[int, "Shape"],
-        tracks_agents: Dict[int, "DataContainer"],
-        tracks_cc: "DataContainer",
-        trust_agents: Dict[int, TrustDistribution],
-    ):
-        """Obtains PSMs for all tracks"""
-        psms_tracks = PsmArray(timestamp=tracks_cc.timestamp, psms=[])
-
-        # assign clusters to existing tracks for IDs
-        clusters = self.clusterer(tracks_agents, frame=0, timestamp=0)
-        A = build_A_from_distance(
-            [c.centroid()[:2] for c in clusters], [t.x[:2] for t in tracks_cc]
-        )
-        assign = gnn_single_frame_assign(A, cost_threshold=self.assign_radius)
-
-        # assignments - run pseudomeasurement generation
-        for j_clust, i_track in assign.iterate_over("rows", with_cost=False).items():
-            i_track = i_track[0]  # one edge only
-            psms_tracks.extend(
-                self.psms_track_assigned(
-                    position_agents=position_agents,
-                    fov_agents=fov_agents,
-                    trust_agents=trust_agents,
-                    cluster=clusters[j_clust],
-                    track_cc=tracks_cc[i_track],
-                    timestamp=tracks_cc.timestamp,
-                )
-            )
-
-        # lone clusters - do not do anything, assume they start new tracks
-        for j_clust in assign.unassigned_rows:
-            pass
-
-        # lone tracks - penalize because of no detections (if in view)
-        for i_track in assign.unassigned_cols:
-            psms_tracks.extend(
-                self.psms_track_unassigned(
-                    position_agents=position_agents,
-                    fov_agents=fov_agents,
-                    trust_agents=trust_agents,
-                    track_cc=tracks_cc[i_track],
-                    timestamp=tracks_cc.timestamp,
-                )
-            )
-
-        return psms_tracks
-
-    def psms_track_assigned(
-        self,
-        position_agents: Dict[int, "Position"],
-        fov_agents: Dict[int, Union["Shape", np.ndarray]],
-        trust_agents: Dict[int, TrustDistribution],
-        cluster: "Cluster",
-        track_cc: "TrackBase",
-        timestamp: float,
-        d_thresh_self: float = 1.0,
-    ):
-        """Creates PSMs for one track"""
-        psms = []
-        for i_agent in fov_agents:
-            if points_in_fov(track_cc.x[:2], fov_agents[i_agent]):
-                # Get the PSM values
-                saw = i_agent in cluster.agent_IDs  # did this agent see it?
-                if saw:  # positive result
-                    dets = cluster.get_objects_by_agent_ID(i_agent)
-                    if len(dets) > 1:
-                        if self.verbose:
-                            logging.warning(
-                                "Clustered more than one detection to track..."
+                    # it's not the agent - check if in fov
+                    if box_in_fov(track_central.box3d, fov_agent):
+                        # if in fov, negative PSMs
+                        psms_agents.append(
+                            Psm(
+                                timestamp=timestamp,
+                                target=i_agent,
+                                value=1 - trust_tracks[ID_central].mean,
+                                confidence=1 - trust_tracks[ID_central].variance,
+                                source=ID_central,
                             )
-                    value = 1.0
-                    confidence = trust_agents[i_agent].mean
-                else:  # negative result
-                    # Handle case where agent can't see itself
-                    if (
-                        np.linalg.norm(position_agents[i_agent].x[:3] - track_cc.x[:3])
-                        < d_thresh_self
-                    ):
-                        value = 1.0
-                        confidence = 1.0
+                        )
+                        self._diagnostics["agent"][i_agent][ID_central] = {
+                            "type": "unassigned",
+                            "in_fov": True,
+                            "distance": None,
+                            "track_is_agent": False,
+                            "identifier": "agent_unassigned_central_in_fov",
+                        }
+                        psms_tracks.append(
+                            Psm(
+                                timestamp=timestamp,
+                                target=ID_central,
+                                value=0.0,
+                                confidence=trust_agents[i_agent].mean,
+                                source=i_agent,
+                            )
+                        )
+                        self._diagnostics["track"][ID_central][i_agent] = {
+                            "type": "unassigned",
+                            "in_fov": True,
+                            "distance": None,
+                            "track_is_agent": False,
+                            "identifier": "track_unassigned_central_in_fov",
+                        }
                     else:
-                        value = 0.0
-                        confidence = trust_agents[i_agent].mean
-                # Construct the psm
-                psm = Psm(
-                    timestamp=timestamp,
-                    target=track_cc.ID,
-                    value=value,
-                    confidence=confidence,
-                    source=i_agent,
-                )
-                psms.append(psm)
-        return PsmArray(timestamp=timestamp, psms=psms)
+                        # if not in fov, pass
+                        self._diagnostics["agent"][i_agent][ID_central] = {
+                            "type": "unassigned",
+                            "in_fov": False,
+                            "distance": None,
+                            "track_is_agent": False,
+                            "identifier": "agent_unassigned_central_not_in_fov",
+                        }
+                        self._diagnostics["track"][ID_central][i_agent] = {
+                            "type": "unassigned",
+                            "in_fov": False,
+                            "distance": None,
+                            "track_is_agent": False,
+                            "identifier": "track_unassigned_central_not_in_fov",
+                        }
 
-    def psms_track_unassigned(
-        self,
-        position_agents: Dict[int, "Position"],
-        fov_agents: Dict[int, Union["Shape", np.ndarray]],
-        trust_agents: Dict[int, TrustDistribution],
-        track_cc: "TrackBase",
-        timestamp: float,
-    ):
-        psms = []
-        for i_agent in fov_agents:
-            if points_in_fov(track_cc.x[:2], fov_agents[i_agent]):
-                psm = Psm(
-                    timestamp=timestamp,
-                    target=track_cc.ID,
-                    value=0.0,
-                    confidence=trust_agents[i_agent].mean,
-                    source=i_agent,
-                )
-                psms.append(psm)
-        return PsmArray(timestamp=timestamp, psms=psms)
+        return psms_agents, psms_tracks
