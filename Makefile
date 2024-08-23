@@ -1,7 +1,7 @@
-NAME := mate
+NAME := avtrust
 INSTALL_STAMP := .install.stamp
 POETRY := $(shell command -v poetry 2> /dev/null)
-PYFOLDERS := mate tests
+PYFOLDERS := avtrust tests
 .DEFAULT_GOAL := help
 
 .PHONY: help
@@ -19,12 +19,8 @@ help:
 install: $(INSTALL_STAMP)
 $(INSTALL_STAMP): pyproject.toml poetry.lock
 		@if [ -z $(POETRY) ]; then echo "Poetry could not be found. See https://python-poetry.org/docs/"; exit 2; fi
-		$(POETRY) install
+		$(POETRY) install --all-extras
 		touch $(INSTALL_STAMP)
-
-.PHONY: simulation
-simulation: $(INSTALL_STAMP)
-	$(POETRY) run python analysis/run_scenario.py config/scenarios/test_scenario.py --display
 
 .PHONY: clean
 clean:
@@ -34,17 +30,16 @@ clean:
 .PHONY: lint
 lint: $(INSTALL_STAMP)
 		$(POETRY) run isort --profile=black --lines-after-imports=2 --check-only $(PYFOLDERS)
-		$(POETRY) run black --check $(PYFOLDERS) --diff
-		$(POETRY) run flake8 --ignore=W503,E501 $(PYFOLDERS)
-		$(POETRY) run mypy $(PYFOLDERS) --ignore-missing-imports
-		$(POETRY) run bandit -r $(PYFOLDERS) -s B608
+		$(POETRY) run black --check $(PYFOLDERS)  --diff
+		$(POETRY) run flake8 --ignore=W503,E501 $(PYFOLDERS) 
+		$(POETRY) run mypy $(PYFOLDERS)  --ignore-missing-imports
+		$(POETRY) run bandit -r $(NAME) -s B608
 
 .PHONY: format
 format: $(INSTALL_STAMP)
-		$(POETRY) run autoflake --remove-all-unused-imports -i -r $(PYFOLDERS) --exclude=__init__.py
-		$(POETRY) run isort --profile=black --lines-after-imports=2 $(PYFOLDERS)
-		$(POETRY) run black $(PYFOLDERS)
-
+		$(POETRY) run autoflake --remove-all-unused-imports -i -r $(PYFOLDERS) --exclude=__init__.py 
+		$(POETRY) run isort --profile=black --lines-after-imports=2 $(PYFOLDERS) 
+		$(POETRY) run black $(PYFOLDERS) 
 
 .PHONY: test
 test: $(INSTALL_STAMP)

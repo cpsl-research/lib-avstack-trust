@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING, Union
 
 
 if TYPE_CHECKING:
-    from mate.measurement import TrustArray, UncertainTrustArray
+    from avtrust.measurement import TrustArray, UncertainTrustArray
     from scipy.stats._result_classes import BinomTestResult
 
 import numpy as np
@@ -12,7 +12,7 @@ from avstack.datastructs import PriorityQueue
 from avstack.modules.estimation import kalman
 from scipy.stats import binomtest, multivariate_normal, norm
 
-from mate.sampling import n_eff, systematic_sampling
+from avtrust.sampling import n_eff, systematic_sampling
 
 
 EPS = np.finfo(float).eps
@@ -175,7 +175,7 @@ class _KalmanTrustEstimator(_TrustEstimator):
 
 @MODELS.register_module()
 class DirectLinearKalmanTrustEstimator(_KalmanTrustEstimator):
-    """Approximates trust as Gaussian even though it is on [0, 1]"""
+    """Approxiavtrusts trust as Gaussian even though it is on [0, 1]"""
 
     multi = True
 
@@ -468,7 +468,7 @@ class MaximumLikelihoodTrustEstimator(_TrustEstimator):
         update_weighting: str = "uniform",
         verbose: bool = False,
     ) -> None:
-        """Estimate distribution based on maximum likelihood over a window
+        """Estiavtrust distribution based on maximum likelihood over a window
 
         inputs:
             dist: the distribution to model the trust on
@@ -558,7 +558,7 @@ class ParticleFilter(_TrustEstimator):
         n_steps_between_resampling: int = 0,
         verbose: bool = False,
     ) -> None:
-        """Create a particle filter to estimate trust
+        """Create a particle filter to estiavtrust trust
 
         noise_variance: variance of the noise (s^2)
         prior: prior distribution of particles

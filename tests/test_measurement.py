@@ -4,8 +4,8 @@ from avstack.geometry import Attitude, Box3D, GlobalOrigin3D, Position
 from avstack.geometry.fov import Circle
 from avstack.modules.tracking import BasicBoxTrack3D
 
-from mate.distributions import TrustArray, TrustBetaDistribution
-from mate.measurement import ViewBasedPsm
+from avtrust.distributions import TrustArray, TrustBetaDistribution
+from avtrust.measurement import ViewBasedPsm
 
 
 def make_one_agent_cc_track(ID_agent=0, ID_track=10, dy_offset=0.0):
@@ -17,7 +17,7 @@ def make_one_agent_cc_track(ID_agent=0, ID_track=10, dy_offset=0.0):
         t0=0.0,
         box3d=Box3D(
             position=Position(np.array([0.5, 0, 0]), reference=GlobalOrigin3D),
-            attitude=Attitude(q=np.quaternion(), reference=GlobalOrigin3D),
+            attitude=Attitude(q=np.quaternion(1), reference=GlobalOrigin3D),
             hwl=[2, 2, 2],
         ),
         ID_force=ID_track,
@@ -28,7 +28,7 @@ def make_one_agent_cc_track(ID_agent=0, ID_track=10, dy_offset=0.0):
         t0=0.0,
         box3d=Box3D(
             position=Position(np.array([0.5, dy_offset, 0]), reference=GlobalOrigin3D),
-            attitude=Attitude(q=np.quaternion(), reference=GlobalOrigin3D),
+            attitude=Attitude(q=np.quaternion(1), reference=GlobalOrigin3D),
             hwl=[2, 2, 2],
         ),
         ID_force=ID_track,

@@ -1,7 +1,7 @@
 import numpy as np
 
-from mate.distributions import TrustBetaDistribution
-from mate.propagator import (
+from avtrust.distributions import TrustBetaDistribution
+from avtrust.propagator import (
     MeanPropagator,
     PrecisionPropagator,
     PriorInterpolationPropagator,

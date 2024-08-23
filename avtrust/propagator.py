@@ -3,8 +3,8 @@ from typing import Union
 import numpy as np
 from avstack.config import ConfigDict
 
-from mate.config import MATE
-from mate.distributions import TrustBetaDistribution, TrustDistribution
+from avtrust.config import MATE
+from avtrust.distributions import TrustBetaDistribution, TrustDistribution
 
 
 class DistributionPropagator:

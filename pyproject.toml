@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "mate"
+name = "lib-avstack-trust"
 version = "0.1.0-alpha.1"
 description = "Prototyping estimators for multi-agent trust modeling"
 authors = ["Spencer Hallyburton <spencer.hallyburton@duke.edu>"]
@@ -11,6 +11,7 @@ classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
 ]
+packages = [{include = "avtrust"}]
 
 [tool.poetry.dependencies]
 python = "~3.10"
@@ -18,8 +19,12 @@ pymc = "~5.10.4"
 PyQt5 = "=5.15.2"
 matplotlib-label-lines = "~0.7.0"
 matplotlib = "^3.9.0"
-# comment out when using as submodule
-# lib-avstack-core = { path = "third_party/lib-avstack-core", develop = true, extras = [] }
+
+# avstack dependencies
+lib-avstack-core = {path="./third_party/lib-avstack-core", develop=true, optional=true}
+
+[tool.poetry.extras]
+avstack = ["lib-avstack-core"]
 
 [tool.poetry.group.test.dependencies]
 pytest = "^7"

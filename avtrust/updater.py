@@ -102,11 +102,11 @@ class TrustUpdater:
     # propagators
     # ==========================================
 
-    def propagate_agent_trust(self, timestamp: float):
+    def _propagate_agent_trust(self, timestamp: float) -> None:
         """Propagate agent trust distributions"""
         self.trust_agents.propagate(timestamp, self.agent_propagator)
 
-    def propagate_track_trust(self, timestamp: float):
+    def _propagate_track_trust(self, timestamp: float) -> None:
         """Propagate track trust distributions"""
         self.trust_tracks.propagate(timestamp, self.track_propagator)
 
@@ -114,16 +114,17 @@ class TrustUpdater:
     # updaters
     # ==========================================
 
-    def update_agent_trust(self, psms_agents: PsmArray):
-        # self.propagate_agent_trust(psms_agents.timestamp)
+    def update_agent_trust(self, psms_agents: PsmArray) -> TrustArray:
+        self._propagate_agent_trust(psms_agents.timestamp)
         psms_agents_target = psms_agents.reduce_by_target()
         for i_agent, psms in psms_agents_target.items():
             for psm in psms:
                 self.trust_agents[i_agent].update(psm)
+        self.trust_agents.timestsamp = psms_agents.timestamp
         return self.trust_agents
 
-    def update_track_trust(self, psms_tracks: PsmArray):
-        # self.propagate_track_trust(psms_tracks.timestamp)
+    def update_track_trust(self, psms_tracks: PsmArray) -> TrustArray:
+        self._propagate_track_trust(psms_tracks.timestamp)
         psms_tracks_target = psms_tracks.reduce_by_target()
         for ID_track, psms in psms_tracks_target.items():
             # ***enforce constraint on number of updates***
@@ -134,4 +135,5 @@ class TrustUpdater:
             if len(psms) > 1:
                 for psm in psms:
                     self.trust_tracks[ID_track].update(psm)
+        self.trust_tracks.timestamp = psms_tracks.timestamp
         return self.trust_tracks

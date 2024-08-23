@@ -1,10 +1,10 @@
-from . import connectives, distribution, estimate, measurement, pipeline, state
+from . import connectives, distribution, estiavtrust, measurement, pipeline, state
 
 
 __all__ = [
     "connectives",
     "distribution",
-    "estimate",
+    "estiavtrust",
     "measurement",
     "pipeline",
     "state",

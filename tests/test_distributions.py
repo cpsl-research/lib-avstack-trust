@@ -1,5 +1,5 @@
-from mate.distributions import TrustBetaDistribution
-from mate.measurement import Psm
+from avtrust.distributions import TrustBetaDistribution
+from avtrust.measurement import Psm
 
 
 def test_copy_beta():

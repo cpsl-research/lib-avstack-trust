@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any, Dict, List
 
 
 if TYPE_CHECKING:
-    from mate.connectives import _DeMorganTriple
+    from avtrust.connectives import _DeMorganTriple
     from avstack.geometry.fov import Shape
     from avstack.modules.tracking.tracks import _TrackBase
     from avstack.modules.clustering import Cluster
@@ -14,11 +14,11 @@ import numpy as np
 from avstack.config import MODELS, ConfigDict
 from avstack.geometry.datastructs import Pose
 
-from mate import distribution
-from mate.state import Agent
+from avtrust import distribution
+from avtrust.state import Agent
 
 
-# from mate.connectives import StandardFuzzy, WeightedAverageFuzzy
+# from avtrust.connectives import StandardFuzzy, WeightedAverageFuzzy
 
 
 def softmax(x):
@@ -161,8 +161,8 @@ class ClusterScorerV1:
         - fovs: a dict mapping agent ID to field of view models
 
         Outputs:
-        - score: an estimate of trust on [0, 1] for each agent
-        - uncertainty: an estimate of noise variance on (0, inf) for each agent
+        - score: an estiavtrust of trust on [0, 1] for each agent
+        - uncertainty: an estiavtrust of noise variance on (0, inf) for each agent
         """
         N_exp = 0
         taus = [prior]
@@ -240,8 +240,8 @@ class AgentScorer:
         - fovs: a dict mapping agent ID to field of view models
 
         Outputs:
-        - score: an estimate of trust on [0, 1] for each agent
-        - uncertainty: an estimate of noise variance on (0, inf) for each agent
+        - score: an estiavtrust of trust on [0, 1] for each agent
+        - uncertainty: an estiavtrust of noise variance on (0, inf) for each agent
 
         this trust scorer is one-trust-per-agent
         assumes that if one track is compromised, the
@@ -377,8 +377,8 @@ class AgentFreeSpaceScorer:
         - fovs: a dict mapping agent ID to field of view models
 
         Outputs:
-        - score: an estimate of trust on [0, 1] for each fov subset overlap
-        - uncertainty: an estimate of noise variance on (0, inf) for each fov subset
+        - score: an estiavtrust of trust on [0, 1] for each fov subset overlap
+        - uncertainty: an estiavtrust of noise variance on (0, inf) for each fov subset
         """
         raise NotImplementedError
 

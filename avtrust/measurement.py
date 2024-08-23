@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Dict, List
+from typing import TYPE_CHECKING, Dict, List, Tuple
 
 
 if TYPE_CHECKING:
@@ -113,6 +113,9 @@ class PsmDiagnostics:
 
 
 class PsmGenerator:
+    def __call__(self, *args, **kwargs) -> Tuple[PsmArray, PsmArray]:
+        raise NotImplementedError
+
     def psms_agents(self):
         raise NotImplementedError
 
@@ -145,7 +148,7 @@ class ViewBasedPsm(PsmGenerator):
         trust_agents: Dict[int, TrustDistribution],
         trust_tracks: Dict[int, TrustDistribution],
         d_self_thresh: float = 1.0,
-    ):
+    ) -> Tuple[PsmArray, PsmArray]:
         # -- reset the diagnostics
         self._diagnostics["agent"] = {
             id_agent: {track.ID: {} for track in tracks_cc}

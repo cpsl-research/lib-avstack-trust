@@ -1,9 +1,12 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Dict, Tuple
 
 
 if TYPE_CHECKING:
-    from .measurement import PsmGenerator
-    from .updater import TrustUpdater
+    from avstack.datastructs import DataContainer
+    from avstack.geometry import Position, Shape
+
+    from .measurement import PsmArray, PsmGenerator
+    from .updater import TrustArray, TrustUpdater
 
 
 class TrustEstimator:
@@ -11,7 +14,13 @@ class TrustEstimator:
         self.measurement = measurement
         self.updater = updater
 
-    def __call__(self, position_agents, fov_agents, tracks_agents, tracks_cc):
+    def __call__(
+        self,
+        position_agents: Dict[str, "Position"],
+        fov_agents: Dict[str, "Shape"],
+        tracks_agents: Dict[str, "DataContainer"],
+        tracks_cc: "DataContainer",
+    ) -> Tuple["TrustArray", "TrustArray", "PsmArray", "PsmArray"]:
         # Init new distributions if needed
         timestamp = tracks_cc.timestamp
         self.updater.init_new_agents(timestamp, list(position_agents.keys()))

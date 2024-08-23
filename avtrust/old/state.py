@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from avstack.geometry.datastructs import Pose
 
-    from mate.fov import Shape
+    from avtrust.fov import Shape
 
 
 class Agent:

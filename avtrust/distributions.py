@@ -7,7 +7,7 @@ if TYPE_CHECKING:
     from .measurement import Psm
     from .propagator import DistributionPropagator
 
-from mate.config import MATE
+from avtrust.config import MATE
 
 
 class TrustDistEncoder(json.JSONEncoder):
@@ -158,6 +158,9 @@ class TrustArray:
 
     def __str__(self) -> str:
         return f"TrustArray at time {self.timestamp}, {self.trusts}"
+
+    def keys(self):
+        return self.trusts.keys()
 
     def append(self, other: "TrustDistribution"):
         self.trusts[other.identifier] = other

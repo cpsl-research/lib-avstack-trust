@@ -1,4 +1,4 @@
-from mate.updater import TrustUpdater
+from avtrust.updater import TrustUpdater
 
 
 def test_init_new_agents():
