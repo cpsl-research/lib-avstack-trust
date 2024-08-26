@@ -9,7 +9,7 @@ import numpy as np
 from avstack.geometry.fov import box_in_fov
 from avstack.modules.assignment import build_A_from_distance, gnn_single_frame_assign
 
-from .config import MATE
+from .config import AVTRUST
 from .distributions import TrustDistribution
 
 
@@ -129,7 +129,7 @@ class PsmGenerator:
         raise NotImplementedError
 
 
-@MATE.register_module()
+@AVTRUST.register_module()
 class ViewBasedPsm(PsmGenerator):
     """Simple overlap-based PSM function"""
 

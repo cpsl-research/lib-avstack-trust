@@ -2,11 +2,12 @@ from typing import List
 
 from avstack.config import ConfigDict
 
-from .config import MATE
+from .config import AVTRUST
 from .distributions import TrustArray, TrustBetaDistribution
 from .measurement import PsmArray
 
 
+@AVTRUST.register_module()
 class TrustUpdater:
     def __init__(
         self,
@@ -35,8 +36,8 @@ class TrustUpdater:
             "dt_return": 10,
         },
     ):
-        self.agent_propagator = MATE.build(agent_propagator)
-        self.track_propagator = MATE.build(track_propagator)
+        self.agent_propagator = AVTRUST.build(agent_propagator)
+        self.track_propagator = AVTRUST.build(track_propagator)
         self._prior_agents = prior_agents
         self._prior_tracks = prior_tracks
         self._prior_means = {"distrusted": 0.2, "untrusted": 0.5, "trusted": 0.8}
@@ -66,20 +67,20 @@ class TrustUpdater:
 
     def init_new_agents(self, timestamp: float, agent_ids: List[int]):
         # check for new agents
-        for i_agent in agent_ids:
-            if i_agent not in self.trust_agents:
+        for agent_id in agent_ids:
+            if agent_id not in self.trust_agents:
                 prior = self._prior_agents.get(
-                    i_agent, {"type": "untrusted", "strength": 1}
+                    agent_id, {"type": "untrusted", "strength": 1}
                 )
                 self.trust_agents.append(
-                    self.init_trust_distribution(timestamp, i_agent, prior)
+                    self.init_trust_distribution(timestamp, agent_id, prior)
                 )
 
         # check for old agents
         agent_keys = list(self.trust_agents.trusts.keys())
-        for i_agent in agent_keys:
-            if i_agent not in agent_ids:
-                self.trust_agents.remove(self.trust_agents[i_agent])
+        for agent_id in agent_keys:
+            if agent_id not in agent_ids:
+                self.trust_agents.remove(self.trust_agents[agent_id])
 
     def init_new_tracks(self, timestamp: float, track_ids: List[int]):
         # check for new tracks
@@ -94,9 +95,9 @@ class TrustUpdater:
 
         # check for old tracks
         track_keys = list(self.trust_tracks.trusts.keys())
-        for i_track in track_keys:
-            if i_track not in track_ids:
-                self.trust_tracks.remove(self.trust_tracks[i_track])
+        for track_id in track_keys:
+            if track_id not in track_ids:
+                self.trust_tracks.remove(self.trust_tracks[track_id])
 
     # ==========================================
     # propagators
@@ -120,7 +121,7 @@ class TrustUpdater:
         for i_agent, psms in psms_agents_target.items():
             for psm in psms:
                 self.trust_agents[i_agent].update(psm)
-        self.trust_agents.timestsamp = psms_agents.timestamp
+        self.trust_agents.timestamp = psms_agents.timestamp
         return self.trust_agents
 
     def update_track_trust(self, psms_tracks: PsmArray) -> TrustArray:

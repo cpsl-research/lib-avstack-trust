@@ -9,18 +9,29 @@ if TYPE_CHECKING:
     from .updater import TrustArray, TrustUpdater
 
 
+from avtrust.config import AVTRUST
+
+
+@AVTRUST.register_module()
 class TrustEstimator:
-    def __init__(self, measurement: "PsmGenerator", updater: "TrustUpdater"):
-        self.measurement = measurement
-        self.updater = updater
+    def __init__(
+        self,
+        measurement: "PsmGenerator",
+        updater: "TrustUpdater",
+    ):
+        self.measurement = (
+            AVTRUST.build(measurement) if isinstance(measurement, dict) else measurement
+        )
+        self.updater = AVTRUST.build(updater) if isinstance(updater, dict) else updater
 
     def __call__(
         self,
-        position_agents: Dict[str, "Position"],
-        fov_agents: Dict[str, "Shape"],
-        tracks_agents: Dict[str, "DataContainer"],
+        position_agents: Dict[int, "Position"],
+        fov_agents: Dict[int, "Shape"],
+        tracks_agents: Dict[int, "DataContainer"],
         tracks_cc: "DataContainer",
     ) -> Tuple["TrustArray", "TrustArray", "PsmArray", "PsmArray"]:
+
         # Init new distributions if needed
         timestamp = tracks_cc.timestamp
         self.updater.init_new_agents(timestamp, list(position_agents.keys()))

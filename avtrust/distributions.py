@@ -7,7 +7,7 @@ if TYPE_CHECKING:
     from .measurement import Psm
     from .propagator import DistributionPropagator
 
-from avtrust.config import MATE
+from avtrust.config import AVTRUST
 
 
 class TrustDistEncoder(json.JSONEncoder):
@@ -50,13 +50,21 @@ class TrustDistribution:
         raise NotImplementedError
 
 
-@MATE.register_module()
+@AVTRUST.register_module()
 class TrustBetaDistribution(TrustDistribution):
-    def __init__(self, timestamp: float, identifier: str, alpha: float, beta: float):
+    def __init__(
+        self,
+        timestamp: float,
+        identifier: str,
+        alpha: float,
+        beta: float,
+        negativity_bias: float = 2.0,
+    ):
         self.timestamp = timestamp
         self.identifier = identifier
         self.alpha = alpha
         self.beta = beta
+        self._negativity_bias = negativity_bias
         self._t_last_update = timestamp
 
     def __repr__(self) -> str:
@@ -134,8 +142,11 @@ class TrustBetaDistribution(TrustDistribution):
             raise ValueError(
                 f"PSM {psm.target} target does not match trust identifier {self.identifier}"
             )
-        self.alpha += psm.confidence * psm.value
-        self.beta += psm.confidence * (1 - psm.value)
+        n = self._negativity_bias
+        w_pos = 2 / (n + 1)
+        w_neg = 2 * n / (n + 1)
+        self.alpha += w_pos * psm.confidence * psm.value
+        self.beta += w_neg * psm.confidence * (1 - psm.value)
         self._t_last_update = psm.timestamp
 
 

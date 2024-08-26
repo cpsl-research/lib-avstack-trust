@@ -3,7 +3,7 @@ from typing import Union
 import numpy as np
 from avstack.config import ConfigDict
 
-from avtrust.config import MATE
+from avtrust.config import AVTRUST
 from avtrust.distributions import TrustBetaDistribution, TrustDistribution
 
 
@@ -20,7 +20,7 @@ class DistributionPropagator:
         raise NotImplementedError
 
 
-@MATE.register_module()
+@AVTRUST.register_module()
 class MeanPropagator(DistributionPropagator):
     def __init__(self, factor_m: float = 30, m_min: float = 0, m_max: float = 1.0):
         """Propagate the mean of a trust distribution towards 0.5
@@ -50,7 +50,7 @@ class MeanPropagator(DistributionPropagator):
             raise NotImplementedError(type(dist))
 
 
-@MATE.register_module()
+@AVTRUST.register_module()
 class PrecisionPropagator(DistributionPropagator):
     def __init__(self, delta_p: float = 0.05, p_min: float = 0, p_max: float = np.inf):
         """Propagate the precision of a trust distribution
@@ -77,7 +77,7 @@ class PrecisionPropagator(DistributionPropagator):
             raise NotImplementedError(type(dist))
 
 
-@MATE.register_module()
+@AVTRUST.register_module()
 class VariancePropagator(DistributionPropagator):
     def __init__(self, delta_v: float = 0.05, v_min: float = 0, v_max: float = np.inf):
         """Propagate the variance of a trust distribution
@@ -104,7 +104,7 @@ class VariancePropagator(DistributionPropagator):
             raise NotImplementedError(type(dist))
 
 
-@MATE.register_module()
+@AVTRUST.register_module()
 class PriorInterpolationPropagator(DistributionPropagator):
     def __init__(
         self, prior: Union[ConfigDict, TrustDistribution], dt_return: float = 10.0
@@ -120,7 +120,7 @@ class PriorInterpolationPropagator(DistributionPropagator):
         """
         self.dt_return = dt_return
         self.prior = (
-            prior if isinstance(prior, TrustDistribution) else MATE.build(prior)
+            prior if isinstance(prior, TrustDistribution) else AVTRUST.build(prior)
         )
 
     def _propagate(self, dt: float, dist: TrustDistribution):
@@ -132,7 +132,7 @@ class PriorInterpolationPropagator(DistributionPropagator):
             raise NotImplementedError(type(dist))
 
 
-@MATE.register_module()
+@AVTRUST.register_module()
 class NormalizationPropagator(DistributionPropagator):
     def __init__(self, parameter_sum: float = 10.0, mean_eps: float = 0.05):
         """Normalize the parameters of a distribution; time-independent
