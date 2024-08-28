@@ -1,7 +1,9 @@
 from .config import AVTRUST
+from .distributions import TrustArray, TrustBetaDistribution
 from .estimator import TrustEstimator
+from .fusion import TrackThresholdingTrustFusion
 from .hooks import TrustFusionHook
-from .measurement import ViewBasedPsm
+from .measurement import Psm, PsmArray, ViewBasedPsm
 from .propagator import (
     MeanPropagator,
     PrecisionPropagator,
@@ -16,8 +18,13 @@ from .updater import TrustUpdater
 
 __all__ = [
     "AVTRUST",
+    "TrustArray",
+    "TrustBetaDistribution",
     "TrustEstimator",
+    "TrackThresholdingTrustFusion",
     "TrustFusionHook",
+    "Psm",
+    "PsmArray",
     "PriorInterpolationPropagator",
     "MeanPropagator",
     "VariancePropagator",

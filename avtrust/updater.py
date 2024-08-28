@@ -35,12 +35,16 @@ class TrustUpdater:
             },
             "dt_return": 10,
         },
+        agent_negativity_bias: float = 2.0,
+        track_negativity_bias: float = 1.0,
     ):
         self.agent_propagator = AVTRUST.build(agent_propagator)
         self.track_propagator = AVTRUST.build(track_propagator)
         self._prior_agents = prior_agents
         self._prior_tracks = prior_tracks
         self._prior_means = {"distrusted": 0.2, "untrusted": 0.5, "trusted": 0.8}
+        self._agent_negativity_bias = agent_negativity_bias
+        self._track_negativity_bias = track_negativity_bias
         self._set_data_structures()
 
     def _set_data_structures(self):
@@ -56,13 +60,19 @@ class TrustUpdater:
     # initialization
     # ==========================================
 
-    def init_trust_distribution(self, timestamp: float, identifier: str, prior: dict):
+    def init_trust_distribution(
+        self, timestamp: float, identifier: str, prior: dict, negativity_bias: float
+    ):
         mean = self._prior_means[prior["type"]]
         precision = prior["strength"]
         alpha = mean * precision
         beta = (1 - mean) * precision
         return TrustBetaDistribution(
-            timestamp=timestamp, identifier=identifier, alpha=alpha, beta=beta
+            timestamp=timestamp,
+            identifier=identifier,
+            alpha=alpha,
+            beta=beta,
+            negativity_bias=negativity_bias,
         )
 
     def init_new_agents(self, timestamp: float, agent_ids: List[int]):
@@ -73,7 +83,12 @@ class TrustUpdater:
                     agent_id, {"type": "untrusted", "strength": 1}
                 )
                 self.trust_agents.append(
-                    self.init_trust_distribution(timestamp, agent_id, prior)
+                    self.init_trust_distribution(
+                        timestamp=timestamp,
+                        identifier=agent_id,
+                        prior=prior,
+                        negativity_bias=self._agent_negativity_bias,
+                    )
                 )
 
         # check for old agents
@@ -90,7 +105,12 @@ class TrustUpdater:
                     track_id, {"type": "untrusted", "strength": 1}
                 )
                 self.trust_tracks.append(
-                    self.init_trust_distribution(timestamp, track_id, prior)
+                    self.init_trust_distribution(
+                        timestamp=timestamp,
+                        identifier=track_id,
+                        prior=prior,
+                        negativity_bias=self._track_negativity_bias,
+                    )
                 )
 
         # check for old tracks

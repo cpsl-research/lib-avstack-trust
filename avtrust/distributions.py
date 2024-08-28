@@ -1,6 +1,9 @@
 import json
 import math
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING, List, Union
+
+import numpy as np
+from scipy.stats import beta as beta_dist
 
 
 if TYPE_CHECKING:
@@ -40,6 +43,14 @@ class TrustDistDecoder(json.JSONDecoder):
 
 class TrustDistribution:
     @property
+    def mean(self):
+        raise NotImplementedError
+
+    @property
+    def variance(self):
+        raise NotImplementedError
+
+    @property
     def std(self):
         return math.sqrt(self.variance)
 
@@ -47,6 +58,12 @@ class TrustDistribution:
         return json.dumps(self, cls=TrustDistEncoder)
 
     def update(self, psm: "Psm"):
+        raise NotImplementedError
+
+    def pdf(self, x: np.ndarray) -> np.ndarray:
+        raise NotImplementedError
+
+    def cdf(self, x: np.ndarray) -> np.ndarray:
         raise NotImplementedError
 
 
@@ -129,6 +146,25 @@ class TrustBetaDistribution(TrustDistribution):
             / ((self.alpha + self.beta) ** 2 * (self.alpha + self.beta + 1))
         )
 
+    @staticmethod
+    def compute_neg_weights(
+        value: float, confidence: float, bias: float, threshold: float = 0.4
+    ):
+        """Compute the positive and negative weights based on negativity bias
+
+        Constraints:
+            d_alpha + d_beta = n
+            d_alpha / d_beta = NEG(value, confidence)
+
+        Negativity Bias Function:
+            def NEG(value, confidence, bias):
+                return bias if value < threshold else 1.0
+        """
+        n = bias if value < threshold else 1.0
+        w_pos = n / (n + 1)
+        w_neg = n * n / (n + 1)
+        return w_pos, w_neg
+
     def copy(self):
         return TrustBetaDistribution(
             timestamp=self.timestamp,
@@ -138,16 +174,32 @@ class TrustBetaDistribution(TrustDistribution):
         )
 
     def update(self, psm: "Psm"):
+        """Update the trust distribution parameters
+
+        Takes into account a negativity bias since small
+        amounts of negative information should disproportionally
+        impact the trust distribution relative to an equivalent amount
+        of positive information. The update procedure is as follows:
+
+        The negativity bias is a power function based on the value
+        of the psm itself. See the static method above.
+        """
         if psm.target != self.identifier:
             raise ValueError(
                 f"PSM {psm.target} target does not match trust identifier {self.identifier}"
             )
-        n = self._negativity_bias
-        w_pos = 2 / (n + 1)
-        w_neg = 2 * n / (n + 1)
+        w_pos, w_neg = self.compute_neg_weights(
+            psm.value, psm.confidence, self._negativity_bias
+        )
         self.alpha += w_pos * psm.confidence * psm.value
         self.beta += w_neg * psm.confidence * (1 - psm.value)
         self._t_last_update = psm.timestamp
+
+    def pdf(self, x: np.ndarray) -> np.ndarray:
+        return beta_dist.pdf(x, self.alpha, self.beta)
+
+    def cdf(self, x: np.ndarray) -> np.ndarray:
+        return beta_dist.cdf(x, self.alpha, self.beta)
 
 
 class TrustArray:
@@ -173,8 +225,19 @@ class TrustArray:
     def keys(self):
         return self.trusts.keys()
 
+    def values(self):
+        return self.trusts.values()
+
     def append(self, other: "TrustDistribution"):
         self.trusts[other.identifier] = other
+
+    def extend(self, other: Union[List["TrustDistribution"], "TrustArray"]):
+        try:
+            for value in other.values():
+                self.append(value)
+        except AttributeError:
+            for value in other:
+                self.append(value)
 
     def propagate(self, timestamp: float, propagator: "DistributionPropagator"):
         for trust in self.trusts.values():
