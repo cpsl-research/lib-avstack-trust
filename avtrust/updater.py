@@ -13,6 +13,7 @@ class TrustUpdater:
         self,
         prior_agents={},
         prior_tracks={},
+        prior_means={"distrusted": 0.2, "untrusted": 0.5, "trusted": 0.8},
         agent_propagator: ConfigDict = {
             "type": "PriorInterpolationPropagator",
             "prior": {
@@ -35,16 +36,20 @@ class TrustUpdater:
             },
             "dt_return": 10,
         },
-        agent_negativity_bias: float = 2.0,
+        agent_negativity_bias: float = 4.0,
         track_negativity_bias: float = 1.0,
+        agent_negativity_threshold: float = 0.4,
+        track_negativity_threshold: float = 0.4,
     ):
         self.agent_propagator = AVTRUST.build(agent_propagator)
         self.track_propagator = AVTRUST.build(track_propagator)
         self._prior_agents = prior_agents
         self._prior_tracks = prior_tracks
-        self._prior_means = {"distrusted": 0.2, "untrusted": 0.5, "trusted": 0.8}
+        self._prior_means = prior_means
         self._agent_negativity_bias = agent_negativity_bias
         self._track_negativity_bias = track_negativity_bias
+        self._agent_negativity_threshold = agent_negativity_threshold
+        self._track_negativity_threshold = track_negativity_threshold
         self._set_data_structures()
 
     def _set_data_structures(self):
@@ -61,7 +66,12 @@ class TrustUpdater:
     # ==========================================
 
     def init_trust_distribution(
-        self, timestamp: float, identifier: str, prior: dict, negativity_bias: float
+        self,
+        timestamp: float,
+        identifier: str,
+        prior: dict,
+        negativity_bias: float,
+        negativity_threshold: float,
     ):
         mean = self._prior_means[prior["type"]]
         precision = prior["strength"]
@@ -73,6 +83,7 @@ class TrustUpdater:
             alpha=alpha,
             beta=beta,
             negativity_bias=negativity_bias,
+            negativity_threshold=negativity_threshold,
         )
 
     def init_new_agents(self, timestamp: float, agent_ids: List[int]):
@@ -88,6 +99,7 @@ class TrustUpdater:
                         identifier=agent_id,
                         prior=prior,
                         negativity_bias=self._agent_negativity_bias,
+                        negativity_threshold=self._agent_negativity_threshold,
                     )
                 )
 
@@ -110,6 +122,7 @@ class TrustUpdater:
                         identifier=track_id,
                         prior=prior,
                         negativity_bias=self._track_negativity_bias,
+                        negativity_threshold=self._track_negativity_threshold,
                     )
                 )
 

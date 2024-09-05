@@ -6,7 +6,7 @@ if TYPE_CHECKING:
     from avstack.geometry import Position, Shape
 
 import numpy as np
-from avstack.geometry.fov import box_in_fov
+from avstack.geometry.fov import points_in_fov
 from avstack.modules.assignment import build_A_from_distance, gnn_single_frame_assign
 
 from .config import AVTRUST
@@ -133,9 +133,28 @@ class PsmGenerator:
 class ViewBasedPsm(PsmGenerator):
     """Simple overlap-based PSM function"""
 
-    def __init__(self, assign_radius: float = 1.0, verbose: bool = False):
+    def __init__(
+        self,
+        max_range: float = 70.0,
+        assign_radius: float = 3.0,
+        min_age_threshold: int = 2,
+        distance_weight_threshold: float = 60.0,
+        distance_weight: float = 0.50,
+        n_frames_viewable_bias: int = 3,
+        n_frames_viewable_scaling: int = 3,
+        n_frames_viewable_range_cut: float = 30,
+        verbose: bool = False,
+    ):
         self.assign_radius = assign_radius
+        self.max_range = max_range
+        self.min_age_threshold = min_age_threshold
+        self.distance_weight = distance_weight
+        self.distance_weight_threshold = distance_weight_threshold
+        self.n_frames_viewable_bias = n_frames_viewable_bias
+        self.n_frames_viewable_scaling = n_frames_viewable_scaling
+        self.n_frames_viewable_range_cut = n_frames_viewable_range_cut
         self.verbose = verbose
+        self._fov_tracker = {"current": {}, "consecutive": {}}
         self._diagnostics = PsmDiagnostics()
         self._assign_diagnostics = {}
 
@@ -171,6 +190,22 @@ class ViewBasedPsm(PsmGenerator):
             position_agent = position_agents[i_agent]
             fov_agent = fov_agents[i_agent]
 
+            # -- check which objects are in fov to update the fov tracker
+            tracks_in_fov = {
+                track_cc.ID: points_in_fov(track_cc.x[:2], fov_agent)
+                for track_cc in tracks_cc
+            }
+            self._fov_tracker["current"][i_agent] = tracks_in_fov
+            if i_agent not in self._fov_tracker["consecutive"]:
+                self._fov_tracker["consecutive"][i_agent] = {}
+            for track_ID, in_fov in tracks_in_fov.items():
+                if track_ID not in self._fov_tracker["consecutive"][i_agent]:
+                    self._fov_tracker["consecutive"][i_agent][track_ID] = 0
+                if in_fov:
+                    self._fov_tracker["consecutive"][i_agent][track_ID] += 1
+                else:
+                    self._fov_tracker["consecutive"][i_agent][track_ID] = 0
+
             # -- assignment for this agent
             A = build_A_from_distance(
                 [t.x[:2] for t in tracks_agents[i_agent]],
@@ -192,12 +227,15 @@ class ViewBasedPsm(PsmGenerator):
                 ID_central = tracks_cc[j_trk_central].ID
 
                 # -- agent PSM for assignment
+                confidence = min(
+                    0.9999, max(0.0001, 1 - 2 * trust_tracks[ID_central].std)
+                )
                 psms_agents.append(
                     Psm(
                         timestamp=timestamp,
                         target=i_agent,
                         value=trust_tracks[ID_central].mean,
-                        confidence=1 - trust_tracks[ID_central].variance,
+                        confidence=confidence,
                         source=ID_central,
                     )
                 )
@@ -238,7 +276,7 @@ class ViewBasedPsm(PsmGenerator):
             for j_trk_central in assign.unassigned_cols:
                 ID_central = tracks_cc[j_trk_central].ID
                 track_central = tracks_cc[j_trk_central]
-                d_self = np.linalg.norm(position_agent.x[:3] - track_central.x[:3])
+                d_self = np.linalg.norm(position_agent.x[:2] - track_central.x[:2])
                 if d_self < d_self_thresh:
                     # agent can't see itself - track improves, agent neutral
                     self._diagnostics["agent"][i_agent][ID_central] = {
@@ -266,40 +304,92 @@ class ViewBasedPsm(PsmGenerator):
                     }
                 else:
                     # it's not the agent - check if in fov
-                    if box_in_fov(track_central.box3d, fov_agent):
-                        # if in fov, negative PSMs
-                        psms_agents.append(
-                            Psm(
-                                timestamp=timestamp,
-                                target=i_agent,
-                                value=1 - trust_tracks[ID_central].mean,
-                                confidence=1 - trust_tracks[ID_central].variance,
-                                source=ID_central,
+                    if tracks_in_fov[track_central.ID]:
+                        # don't worry about things too far away
+                        if d_self > self.max_range:
+                            self._diagnostics["agent"][i_agent][ID_central] = {
+                                "type": "unassigned",
+                                "in_fov": True,
+                                "distance": d_self,
+                                "track_is_agent": False,
+                                "identifier": "agent_unassigned_central_out_of_range",
+                            }
+                            self._diagnostics["track"][ID_central][i_agent] = {
+                                "type": "unassigned",
+                                "in_fov": True,
+                                "distance": d_self,
+                                "track_is_agent": False,
+                                "identifier": "track_unassigned_central_out_of_range",
+                            }
+                        else:
+                            # if it hasn't been in the fov for many frames, deweight
+                            n_frames_consec = self._fov_tracker["consecutive"][i_agent][
+                                track_central.ID
+                            ]
+                            if d_self < self.n_frames_viewable_range_cut:
+                                weight_fov = 1.0 if n_frames_consec > 2 else 0.25
+                            else:
+                                weight_fov = (
+                                    n_frames_consec - self.n_frames_viewable_bias
+                                ) / self.n_frames_viewable_scaling
+                            w_fov = min(1.0, max(0.0, weight_fov))
+
+                            # if in fov and in range, negative PSMs
+                            # weight by the distance to handle FOV edge cases
+                            if d_self < self.distance_weight_threshold:
+                                w_dist = 1.0
+                            else:
+                                w_dist = self.distance_weight
+
+                            # weight by track age to handle new tracks
+                            if track_central.n_updates < self.min_age_threshold:
+                                w_age = 0.0
+                            else:
+                                w_age = 1.0
+
+                            # get the total weight
+                            weight = w_fov * w_dist * w_age
+
+                            # make the PSM
+                            confidence = min(
+                                0.9999,
+                                max(
+                                    0.0001,
+                                    weight * (1 - 2 * trust_tracks[ID_central].std),
+                                ),
                             )
-                        )
-                        self._diagnostics["agent"][i_agent][ID_central] = {
-                            "type": "unassigned",
-                            "in_fov": True,
-                            "distance": None,
-                            "track_is_agent": False,
-                            "identifier": "agent_unassigned_central_in_fov",
-                        }
-                        psms_tracks.append(
-                            Psm(
-                                timestamp=timestamp,
-                                target=ID_central,
-                                value=0.0,
-                                confidence=trust_agents[i_agent].mean,
-                                source=i_agent,
+                            psms_agents.append(
+                                Psm(
+                                    timestamp=timestamp,
+                                    target=i_agent,
+                                    value=1 - trust_tracks[ID_central].mean,
+                                    confidence=confidence,
+                                    source=ID_central,
+                                )
                             )
-                        )
-                        self._diagnostics["track"][ID_central][i_agent] = {
-                            "type": "unassigned",
-                            "in_fov": True,
-                            "distance": None,
-                            "track_is_agent": False,
-                            "identifier": "track_unassigned_central_in_fov",
-                        }
+                            self._diagnostics["agent"][i_agent][ID_central] = {
+                                "type": "unassigned",
+                                "in_fov": True,
+                                "distance": None,
+                                "track_is_agent": False,
+                                "identifier": "agent_unassigned_central_in_fov",
+                            }
+                            psms_tracks.append(
+                                Psm(
+                                    timestamp=timestamp,
+                                    target=ID_central,
+                                    value=0.0,
+                                    confidence=weight * trust_agents[i_agent].mean,
+                                    source=i_agent,
+                                )
+                            )
+                            self._diagnostics["track"][ID_central][i_agent] = {
+                                "type": "unassigned",
+                                "in_fov": True,
+                                "distance": None,
+                                "track_is_agent": False,
+                                "identifier": "track_unassigned_central_in_fov",
+                            }
                     else:
                         # if not in fov, pass
                         self._diagnostics["agent"][i_agent][ID_central] = {

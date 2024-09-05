@@ -54,6 +54,10 @@ class TrustDistribution:
     def std(self):
         return math.sqrt(self.variance)
 
+    @property
+    def std_clipped(self):
+        return min(0.9999, max(0.0001, self.std))
+
     def encode(self):
         return json.dumps(self, cls=TrustDistEncoder)
 
@@ -75,13 +79,15 @@ class TrustBetaDistribution(TrustDistribution):
         identifier: str,
         alpha: float,
         beta: float,
-        negativity_bias: float = 2.0,
+        negativity_bias: float = 4.0,
+        negativity_threshold: float = 0.4,
     ):
         self.timestamp = timestamp
         self.identifier = identifier
         self.alpha = alpha
         self.beta = beta
         self._negativity_bias = negativity_bias
+        self._negativity_threshold = negativity_threshold
         self._t_last_update = timestamp
 
     def __repr__(self) -> str:
@@ -189,7 +195,10 @@ class TrustBetaDistribution(TrustDistribution):
                 f"PSM {psm.target} target does not match trust identifier {self.identifier}"
             )
         w_pos, w_neg = self.compute_neg_weights(
-            psm.value, psm.confidence, self._negativity_bias
+            value=psm.value,
+            confidence=psm.confidence,
+            bias=self._negativity_bias,
+            threshold=self._negativity_threshold,
         )
         self.alpha += w_pos * psm.confidence * psm.value
         self.beta += w_neg * psm.confidence * (1 - psm.value)
@@ -227,6 +236,9 @@ class TrustArray:
 
     def values(self):
         return self.trusts.values()
+
+    def items(self):
+        return zip(self.trusts.keys(), self.trusts.values())
 
     def append(self, other: "TrustDistribution"):
         self.trusts[other.identifier] = other

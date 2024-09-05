@@ -36,7 +36,7 @@ class TestObject(NamedTuple):
     x: np.ndarray
     ID: int
 
-    def distance(self, other):
+    def distance(self, other, check_reference: bool = False):
         return np.linalg.norm(self.x - other.x)
 
 

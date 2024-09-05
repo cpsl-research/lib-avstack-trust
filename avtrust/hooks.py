@@ -28,7 +28,9 @@ class TrustFusionHook:
             else estimation_hook
         )
         self.fusion = AVTRUST.build(fusion) if isinstance(fusion, dict) else fusion
+        self.tracks_fused = None
         self.tracks_trusted = None
+        self.tracks_agents = None
         self.verbose = verbose
 
     @property
@@ -49,13 +51,25 @@ class TrustFusionHook:
 
     def __call__(
         self,
+        agents: Dict[str, "ObjectState"],
+        fov_agents: Dict[str, "Polygon"],
+        tracks_agents: Dict[str, "DataContainer"],
         tracks_fused: "DataContainer",
         logger=None,
         *args,
         **kwargs,
     ):
         """Interface is identical to that of the trust estimation hook"""
-        self.estimation(tracks_fused=tracks_fused, *args, **kwargs)
+        self.tracks_fused = tracks_fused
+        self.tracks_agents = tracks_agents
+        self.estimation(
+            agents=agents,
+            fov_agents=fov_agents,
+            tracks_agents=tracks_agents,
+            tracks_fused=tracks_fused,
+            *args,
+            **kwargs,
+        )
         if self.trust_tracks is not None:
             self.tracks_trusted = self.fusion(
                 trust_tracks=self.trust_tracks,
@@ -67,7 +81,7 @@ class TrustFusionHook:
                         f"Ran trust fusion model at time {tracks_fused.timestamp}"
                     )
                     logger.info(
-                        f"Pruned from {len(tracks_fused)} tracks to {len(self.tracks_fused)}"
+                        f"Pruned from {len(tracks_fused)} tracks to {len(self.tracks_trusted)}"
                     )
 
 
