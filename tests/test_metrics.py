@@ -3,7 +3,7 @@ from typing import NamedTuple
 import numpy as np
 
 from avtrust.distributions import TrustArray, TrustBetaDistribution
-from avtrust.metrics import (
+from avtrust.metrics.metrics import (
     area_above_cdf,
     area_below_cdf,
     get_trust_agents_metrics,

@@ -1,6 +1,6 @@
 from .config import AVTRUST
 from .distributions import TrustArray, TrustBetaDistribution
-from .estimator import TrustEstimator
+from .estimator import CentralizedTrustEstimator
 from .fusion import TrackThresholdingTrustFusion
 from .hooks import TrustFusionHook
 from .measurement import Psm, PsmArray, ViewBasedPsm
@@ -20,7 +20,8 @@ __all__ = [
     "AVTRUST",
     "TrustArray",
     "TrustBetaDistribution",
-    "TrustEstimator",
+    "CentralizedTrustEstimator",
+    "DistributedTrustEstimator",
     "TrackThresholdingTrustFusion",
     "TrustFusionHook",
     "Psm",

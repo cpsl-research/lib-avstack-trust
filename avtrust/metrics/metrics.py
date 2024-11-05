@@ -11,7 +11,7 @@ import numpy as np
 from avstack.metrics import ConfusionMatrix
 from avstack.modules.assignment import build_A_from_distance, gnn_single_frame_assign
 
-from .distributions import TrustArray
+from ..distributions import TrustArray
 
 
 class AggregateMetricsEncoder(json.JSONEncoder):
@@ -254,34 +254,41 @@ def get_trust_agents_metrics(
     attacked_agents: set,
     assign_radius: float = 2.0,
     f1_threshold: float = 0.9,
+    use_f1_threshold: bool = False,
 ) -> AggregateAgentTrustMetric:
     """Get metrics for the trust scores on agents"""
 
     # assign agent tracks to agent viewable truths
     agent_metrics = {}
     timestamp = 0.0
-    for ID_agent in truths_agents:
-        timestamp = tracks_agents[ID_agent].timestamp
-        A_truth = build_A_from_distance(
-            tracks_agents[ID_agent],
-            truths_agents[ID_agent],
-            check_reference=False,
-        )
-        assigns = gnn_single_frame_assign(A_truth, cost_threshold=assign_radius)
+    for ID_agent in trust_agents:
+        timestamp = trust_agents[ID_agent].timestamp
 
-        # build confusion matrix
-        confusion = ConfusionMatrix(
-            n_true_positives=len(assigns),
-            n_true_negatives=0,  # because assignment problem
-            n_false_positives=len(assigns.unassigned_rows),
-            n_false_negatives=len(assigns.unassigned_cols),
-        )
+        # perform assignment to use f1 score in the metric
+        if use_f1_threshold:
+            A_truth = build_A_from_distance(
+                tracks_agents[ID_agent],
+                truths_agents[ID_agent],
+                check_reference=False,
+            )
+            assigns = gnn_single_frame_assign(A_truth, cost_threshold=assign_radius)
+
+            # build confusion matrix
+            confusion = ConfusionMatrix(
+                n_true_positives=len(assigns),
+                n_true_negatives=0,  # because assignment problem
+                n_false_positives=len(assigns.unassigned_rows),
+                n_false_negatives=len(assigns.unassigned_cols),
+            )
+            f1_score = confusion.f1_score
+        else:
+            f1_score = None
 
         # get the metric
         agent_metrics[ID_agent] = AgentTrustMetric(
             timestamp=timestamp,
             identifier=ID_agent,
-            f1_score=confusion.f1_score,
+            f1_score=f1_score,
             area_above_cdf=area_above_cdf(trust_agents[ID_agent]),
             f1_threshold=f1_threshold,
             agent_is_attacked=ID_agent in attacked_agents,
