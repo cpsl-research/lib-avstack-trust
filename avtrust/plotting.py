@@ -13,7 +13,7 @@ marker_large = 10
 marker_medium = 8
 marker_small = 5
 linewidth = 3
-agent_colors = list(mcolors.TABLEAU_COLORS.keys())
+agent_colors = list(mcolors.XKCD_COLORS.keys())
 track_colors = list(mcolors.XKCD_COLORS.keys())
 det_markers = [str(i + 1) for i in range(len(agent_colors))]
 
@@ -33,42 +33,50 @@ def set_axes(ax):
     plt.tight_layout()
 
 
-def get_quad_trust_axes():
+def get_quad_trust_axes(font_family: str = "serif"):
     # Initialize figure and axes and save to class
     fig, axs = plt.subplots(2, 2, figsize=(10, 6))
     for i, txt in enumerate(["Agent", "Track"]):
         # -- attributes for bar plot
-        axs[i, 0].set_title(f"{txt} Trust Mean")
+        axs[i, 0].set_title(f"{txt} Trust Mean", family=font_family)
         axs[i, 0].set_xlim([0, 1])
-        axs[i, 0].set_xlabel("Mean Trust Value")
-        axs[i, 0].set_ylabel("Identifier")
+        axs[i, 0].set_xlabel("Mean Trust Value", family=font_family)
+        axs[i, 0].set_ylabel("Identifier", family=font_family)
         axs[i, 0].xaxis.grid()
 
         # -- attributes for distribution plot
-        axs[i, 1].set_title(f"{txt} Trust Distributions")
+        axs[i, 1].set_title(f"{txt} Trust Distributions", family=font_family)
         axs[i, 1].set_xlim([0, 1])
         axs[i, 1].set_ylim([0, 10])
-        axs[i, 1].set_xlabel("Trust Value")
-        axs[i, 1].set_ylabel("PDF")
+        axs[i, 1].set_xlabel("Trust Value", family=font_family)
+        axs[i, 1].set_ylabel("PDF", family=font_family)
         axs[i, 1].grid()
     return axs
 
 
-def plot_trust_on_quad(axs, trust_agents, trust_tracks):
+def plot_trust_on_quad(axs, trust_agents, trust_tracks, font_family: str = "serif"):
     x_trust = np.linspace(0, 1, 1000)
     for i, trusts in enumerate([trust_agents, trust_tracks]):
         yticks = []
         ytick_labels = []
         for j, (j_ID, trust) in enumerate(trusts.items()):
-            color = get_agent_color(j) if i == 0 else get_track_color(j)
-            label = f"Agent {j_ID}" if i == 0 else f"Track {j}"
+            color = get_agent_color(j_ID) if i == 0 else get_track_color(j_ID)
+            label = f"Agent {j_ID}" if i == 0 else f"Track {j_ID}"
             yticks.append(j)
             ytick_labels.append(label)
+
             # -- update bars
             y = j
             w = trust.mean
             height = 0.6
-            axs[i, 0].barh(y, w, height=height, left=0.0, color=color, label=label)
+            axs[i, 0].barh(
+                y,
+                w,
+                height=height,
+                left=0.0,
+                color=color,
+                label=label,
+            )
 
             # -- update distributions
             pdfs = trust.pdf(x_trust)
@@ -81,7 +89,7 @@ def plot_trust_on_quad(axs, trust_agents, trust_tracks):
 
         # set the ticks for the identifiers
         axs[i, 0].set_yticks(yticks)
-        axs[i, 0].set_yticklabels(ytick_labels)
+        axs[i, 0].set_yticklabels(ytick_labels, family=font_family)
     plt.tight_layout()
 
 
