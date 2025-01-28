@@ -21,10 +21,7 @@ matplotlib-label-lines = "~0.7.0"
 matplotlib = "^3.9.0"
 
 # avstack dependencies
-lib-avstack-core = {path="./third_party/lib-avstack-core", develop=true, optional=true}
-
-[tool.poetry.extras]
-avstack = ["lib-avstack-core"]
+lib-avstack-core = {path="../lib-avstack-core", develop=true}
 
 [tool.poetry.group.test.dependencies]
 pytest = "^7"
